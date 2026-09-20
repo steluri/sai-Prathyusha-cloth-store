@@ -1,11 +1,80 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowRight, Check, ChevronDown, Heart, Menu, Minus, Plus,
+  ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Menu, Minus, Plus,
   Search, ShoppingBag, Sparkles, Truck, X,
 } from 'lucide-react'
 import { apiUrl, assetUrl } from './api'
 
 const money = value => `₹${Number(value).toLocaleString('en-IN')}`
+
+let razorpayLoader
+function loadRazorpay() {
+  if (window.Razorpay) return Promise.resolve()
+  if (!razorpayLoader) {
+    razorpayLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.async = true
+      script.onload = resolve
+      script.onerror = () => reject(new Error('Could not load Razorpay Checkout. Check your connection and try again.'))
+      document.body.appendChild(script)
+    })
+  }
+  return razorpayLoader
+}
+
+const mensCollections = [
+  { name: 'Shirts', image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Jeans', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Trousers', image: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?auto=format&fit=crop&w=900&q=85' },
+  { name: 'T-shirts', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Kurtas', image: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Dhotis', image: 'https://images.unsplash.com/photo-1603252109303-2751441dd157?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Inners', image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Boys Collections', image: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&w=900&q=85' },
+  { name: 'All Products', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=85' },
+]
+
+const womensCollections = [
+  { name: 'Sarees', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Kurtis', image: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Dresses', image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Tops', image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Jeans', image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Chudidars', image: 'https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Inners', image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Girls Collections', image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=85' },
+  { name: 'All Products', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85' },
+]
+
+const collectionMatchers = {
+  Men: {
+    Shirts: /shirt|collar/i,
+    Jeans: /jean|denim/i,
+    Trousers: /trouser|pant/i,
+    'T-shirts': /t-shirt|tee|polo/i,
+    Kurtas: /kurta/i,
+    Dhotis: /dhoti/i,
+    Inners: /inner|brief|vest/i,
+    'Boys Collections': /boy|junior/i,
+  },
+  Women: {
+    Sarees: /saree/i,
+    Kurtis: /kurti|kurta|co-ord/i,
+    Dresses: /dress/i,
+    Tops: /top|shirt|blouse/i,
+    Jeans: /jean|denim/i,
+    Chudidars: /chudidar|salwar|trouser/i,
+    Inners: /inner|bra|lingerie/i,
+    'Girls Collections': /girl|junior/i,
+  },
+}
+
+function matchesCollection(product, audience, type) {
+  if (product.category !== audience) return false
+  if (type === 'All Products') return true
+  return collectionMatchers[audience]?.[type]?.test(`${product.name} ${product.description || ''}`) || false
+}
 
 function App() {
   const [products, setProducts] = useState([])
@@ -20,6 +89,11 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
+  const [collectionView, setCollectionView] = useState(null)
+  const [minimumPrice, setMinimumPrice] = useState('')
+  const [maximumPrice, setMaximumPrice] = useState('')
+  const [selectedColor, setSelectedColor] = useState('')
+  const [saleOnly, setSaleOnly] = useState(false)
 
   useEffect(() => {
     Promise.all([fetch(apiUrl('/api/products')).then(r => r.json()), fetch(apiUrl('/api/wishlist')).then(r => r.json())])
@@ -43,6 +117,26 @@ function App() {
     if (sort === 'Newest') list = [...list].sort((a, b) => b.id - a.id)
     return list
   }, [products, category, search, sort])
+
+  const collectionBaseProducts = useMemo(() => {
+    if (!collectionView) return []
+    return products.filter(product => matchesCollection(product, collectionView.audience, collectionView.type) &&
+      `${product.name} ${product.color}`.toLowerCase().includes(search.toLowerCase()))
+  }, [products, collectionView, search])
+
+  const collectionProducts = useMemo(() => {
+    let list = collectionBaseProducts.filter(product =>
+      (!minimumPrice || Number(product.price) >= Number(minimumPrice)) &&
+      (!maximumPrice || Number(product.price) <= Number(maximumPrice)) &&
+      (!selectedColor || product.color === selectedColor) &&
+      (!saleOnly || product.old_price))
+    if (sort === 'Price: Low to high') list = [...list].sort((a, b) => a.price - b.price)
+    if (sort === 'Price: High to low') list = [...list].sort((a, b) => b.price - a.price)
+    if (sort === 'Newest') list = [...list].sort((a, b) => b.id - a.id)
+    return list
+  }, [collectionBaseProducts, minimumPrice, maximumPrice, selectedColor, saleOnly, sort])
+
+  const collectionColors = useMemo(() => [...new Set(collectionBaseProducts.map(product => product.color))], [collectionBaseProducts])
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -77,17 +171,37 @@ function App() {
   }
 
   function shopCategory(next) {
+    setCollectionView(null)
     setCategory(next)
-    document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' })
+    window.requestAnimationFrame(() => document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' }))
     setMobileOpen(false)
   }
+
+  function openCollection(audience, type) {
+    if (collectionView?.audience !== audience) {
+      setSelectedColor('')
+      setSaleOnly(false)
+    }
+    setCollectionView({ audience, type })
+    setMobileOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function clearCatalogFilters() {
+    setMinimumPrice('')
+    setMaximumPrice('')
+    setSelectedColor('')
+    setSaleOnly(false)
+  }
+
+  const collectionTabs = collectionView?.audience === 'Women' ? womensCollections : mensCollections
 
   return (
     <div className="site-shell">
       <div className="announcement">Free shipping on orders over ₹2,999 <span>•</span> Easy 14-day returns</div>
       <header className="header">
         <button className="icon-btn mobile-menu" aria-label="Menu" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={21} /></button>
-        <a className="logo" href="#top">Pandu<span>.</span></a>
+        <a className="logo" href="#top" onClick={() => setCollectionView(null)}>Pandu<span>.</span></a>
         <nav className={mobileOpen ? 'nav open' : 'nav'}>
           <button onClick={() => shopCategory('Women')}>Women</button>
           <button onClick={() => shopCategory('Men')}>Men</button>
@@ -101,7 +215,54 @@ function App() {
         </div>
       </header>
 
-      <main id="top">
+      {collectionView && <main className="collection-page">
+        <div className="catalog-layout">
+          <aside className="catalog-filters">
+            <div className="filter-heading"><strong>Filters</strong><button onClick={clearCatalogFilters}>Clear all</button></div>
+            <div className="filter-section price-filter">
+              <strong>Price</strong>
+              <div className="price-track"><span /><span /></div>
+              <div className="price-inputs">
+                <label>Minimum<input type="number" min="0" value={minimumPrice} onChange={e => setMinimumPrice(e.target.value)} placeholder="₹0" /></label>
+                <label>Maximum<input type="number" min="0" value={maximumPrice} onChange={e => setMaximumPrice(e.target.value)} placeholder="₹10000" /></label>
+              </div>
+            </div>
+            <div className="filter-section">
+              <strong>Color</strong>
+              <div className="filter-options">
+                {collectionColors.length ? collectionColors.map(color => <button className={selectedColor === color ? 'active' : ''} key={color} onClick={() => setSelectedColor(selectedColor === color ? '' : color)}><span />{color}</button>) : <p>No colors available</p>}
+              </div>
+            </div>
+            <div className="filter-section">
+              <strong>Offers</strong>
+              <label className="filter-check"><input type="checkbox" checked={saleOnly} onChange={e => setSaleOnly(e.target.checked)} /> On sale</label>
+            </div>
+            <div className="filter-summary-row"><span>Gender</span><strong>{collectionView.audience}</strong></div>
+            <div className="filter-summary-row"><span>Type</span><strong>{collectionView.type}</strong></div>
+          </aside>
+
+          <section className="catalog-results">
+            <button className="collection-back" onClick={() => { setCollectionView(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }}><ArrowLeft size={17} /> Back to home</button>
+            <div className="shop-for">
+              <strong>Shop for</strong>
+              {['Women', 'Men'].map(audience => <button className={collectionView.audience === audience ? 'active' : ''} key={audience} onClick={() => openCollection(audience, 'All Products')}>{audience}</button>)}
+            </div>
+            <div className="catalog-query-row">
+              <p><strong>You searched for “{collectionView.type}”</strong><span>· {collectionProducts.length} products available</span></p>
+              <label className="catalog-sort"><strong>Sort by</strong><span><select value={sort} onChange={e => setSort(e.target.value)}><option>Featured</option><option>Newest</option><option>Price: Low to high</option><option>Price: High to low</option></select><ChevronDown size={16} /></span></label>
+            </div>
+            <div className="collection-type-tabs" role="tablist" aria-label={`${collectionView.audience} collection types`}>
+              {collectionTabs.map(item => <button role="tab" aria-selected={collectionView.type === item.name} className={collectionView.type === item.name ? 'active' : ''} key={item.name} onClick={() => openCollection(collectionView.audience, item.name)}>{item.name}</button>)}
+            </div>
+            {loading ? <div className="loading-grid">{Array.from({ length: 8 }).map((_, i) => <div className="skeleton" key={i} />)}</div> :
+              collectionProducts.length ? <div className="product-grid">
+                {collectionProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} onSave={() => toggleWishlist(product)} onAdd={() => addToCart(product)} />)}
+              </div> : <div className="empty-search"><Search size={28} /><h3>No products match these filters</h3><p>Clear the filters or choose another collection type.</p></div>}
+          </section>
+        </div>
+      </main>}
+
+      <main id="top" className={collectionView ? 'home-view-hidden' : ''}>
         <section className="hero">
           <img src="/atelier-hero.png" alt="Models wearing Pandu's warm neutral collection" />
           <div className="hero-copy">
@@ -140,6 +301,42 @@ function App() {
             </div> : <div className="empty-search"><Search size={28} /><h3>No pieces found</h3><p>Try a different search or category.</p></div>}
         </section>
 
+        <section className="mens-collections womens-collections" aria-labelledby="womens-collections-title">
+          <div className="mens-collections-heading">
+            <div>
+              <p className="eyebrow">Made for every moment</p>
+              <h2 id="womens-collections-title">Womens Collections</h2>
+            </div>
+            <p>From everyday favourites to festive silhouettes, discover styles selected for women and girls.</p>
+          </div>
+          <div className="mens-collection-grid">
+            {womensCollections.map(item => (
+              <button className="mens-collection-card" key={item.name} onClick={() => openCollection('Women', item.name)}>
+                <span className="mens-collection-image"><img src={item.image} alt="" loading="lazy" /></span>
+                <span>{item.name}<ArrowRight size={17} /></span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="mens-collections" aria-labelledby="mens-collections-title">
+          <div className="mens-collections-heading">
+            <div>
+              <p className="eyebrow">Find your style</p>
+              <h2 id="mens-collections-title">Mens Collections</h2>
+            </div>
+            <p>Everyday essentials and traditional favourites, thoughtfully selected for men and boys.</p>
+          </div>
+          <div className="mens-collection-grid">
+            {mensCollections.map(item => (
+              <button className="mens-collection-card" key={item.name} onClick={() => openCollection('Men', item.name)}>
+                <span className="mens-collection-image"><img src={item.image} alt="" loading="lazy" /></span>
+                <span>{item.name}<ArrowRight size={17} /></span>
+              </button>
+            ))}
+          </div>
+        </section>
+
         <section className="story">
           <div className="story-image"><div className="material-card"><span>01</span><strong>Natural fibres</strong><p>Breathable, tactile, enduring.</p></div></div>
           <div className="story-copy"><p className="eyebrow">Our point of view</p><h2>Made with intention.<br /><em>Worn with ease.</em></h2><p>We believe getting dressed should feel simple. That means considered silhouettes, honest materials, and a palette that moves effortlessly through your wardrobe.</p><button className="button outline" onClick={() => shopCategory('All')}>Discover our story <ArrowRight size={17} /></button></div>
@@ -148,7 +345,7 @@ function App() {
         <section className="newsletter"><p className="eyebrow">Stay in the know</p><h2>Notes from the studio</h2><p>New arrivals, quiet inspiration, and 10% off your first order.</p><form onSubmit={e => { e.preventDefault(); notify('Welcome to the Pandu community') }}><input type="email" required placeholder="Your email address" /><button aria-label="Subscribe"><ArrowRight /></button></form></section>
       </main>
 
-      <footer><a className="logo" href="#top">Pandu<span>.</span></a><p>Clothes for living, thoughtfully made.</p><div><a href="#shop">Shop</a><a href="#top">About</a><a href="mailto:hello@Pandu.store">Contact</a></div><small>© 2026 Pandu Studio</small></footer>
+      <footer><a className="logo" href="#top" onClick={() => setCollectionView(null)}>Pandu<span>.</span></a><p>Clothes for living, thoughtfully made.</p><div><a href="#shop" onClick={() => setCollectionView(null)}>Shop</a><a href="#top" onClick={() => setCollectionView(null)}>About</a><a href="mailto:hello@Pandu.store">Contact</a></div><small>© 2026 Pandu Studio</small></footer>
 
       <Drawer open={cartOpen} onClose={() => setCartOpen(false)} title="Your bag" count={cartCount}>
         {!cart.length ? <Empty icon={<ShoppingBag />} title="Your bag is empty" text="Good things are waiting." action={() => { setCartOpen(false); shopCategory('All') }} /> : <>
@@ -187,19 +384,86 @@ function CartItem({ item, onChange }) {
 function Empty({ icon, title, text, action }) { return <div className="empty">{icon}<h3>{title}</h3><p>{text}</p><button className="button dark" onClick={action}>Explore collection</button></div> }
 
 function Checkout({ total, cart, onClose, onComplete }) {
+  const [step, setStep] = useState('contact')
+  const [name, setName] = useState('')
+  const [mobile, setMobile] = useState('')
+  const [address, setAddress] = useState({ door: '', line1: '', line2: '', city: '', pincode: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  async function submit(e) {
+
+  async function request(path, body) {
+    const response = await fetch(apiUrl(path), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
+    return data
+  }
+
+  async function beginPayment(e) {
     e.preventDefault(); setSubmitting(true); setError('')
-    const form = new FormData(e.currentTarget)
     try {
-      const response = await fetch(apiUrl('/api/orders'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customer: form.get('name'), email: form.get('email'), items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })) }) })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
-      onComplete(data)
+      await loadRazorpay()
+      const paymentOrder = await request('/api/payments/razorpay/order', {
+        customer: name,
+        mobile,
+        address,
+        items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
+      })
+      const checkout = new window.Razorpay({
+        key: paymentOrder.key_id,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: 'Pandu',
+        description: 'Clothing order',
+        order_id: paymentOrder.order_id,
+        prefill: paymentOrder.prefill,
+        theme: { color: '#a95f36' },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay using UPI or QR',
+                instruments: [{ method: 'upi' }],
+              },
+            },
+            sequence: ['block.upi'],
+            preferences: { show_default_blocks: true },
+          },
+        },
+        handler: async payment => {
+          try {
+            const order = await request('/api/orders', payment)
+            onComplete(order)
+          } catch (err) {
+            setError(err.message || 'Payment verification failed. Please contact support.')
+            setSubmitting(false)
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setError('Payment was cancelled. You can try again when you’re ready.')
+            setSubmitting(false)
+          },
+        },
+      })
+      checkout.on('payment.failed', response => {
+        setError(response.error?.description || 'Payment failed. Please try another payment method.')
+        setSubmitting(false)
+      })
+      checkout.open()
     } catch (err) { setError(err.message || 'Checkout failed. Please try again.'); setSubmitting(false) }
   }
-  return <div className="modal-wrap"><button className="scrim" onClick={onClose} /><div className="checkout-modal"><button className="modal-close" onClick={onClose}><X /></button><p className="eyebrow">Secure checkout</p><h2>Almost yours.</h2><p className="checkout-intro">Enter your details to place this demo order.</p><form onSubmit={submit}><label>Full name<input name="name" required placeholder="Your name" /></label><label>Email address<input name="email" type="email" required placeholder="you@example.com" /></label><label>Delivery address<textarea name="address" required placeholder="House, street, city, PIN code" /></label><div className="checkout-total"><span>Order total</span><strong>{money(total)}</strong></div>{error && <p className="form-error">{error}</p>}<button className="button dark wide" disabled={submitting}>{submitting ? 'Placing order…' : 'Place order'} <ArrowRight size={17} /></button></form></div></div>
+
+  function updateAddress(field, value) {
+    setAddress(current => ({ ...current, [field]: value }))
+  }
+
+  return <div className="modal-wrap"><button className="scrim" onClick={onClose} aria-label="Close checkout" /><div className="checkout-modal"><button className="modal-close" onClick={onClose} aria-label="Close checkout"><X /></button><p className="eyebrow">Secure checkout · {step === 'contact' ? 'Step 1 of 2' : 'Step 2 of 2'}</p>
+    {step === 'contact' ? <><h2>Your details.</h2><p className="checkout-intro">Tell us who the order is for.</p><form onSubmit={e => { e.preventDefault(); setError(''); setStep('address') }}><label>Full name<input name="name" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></label><label>Mobile number<div className="mobile-input"><span>+91</span><input name="mobile" type="tel" inputMode="numeric" autoComplete="tel" required maxLength="10" pattern="[6-9][0-9]{9}" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="98765 43210" /></div></label>{error && <p className="form-error">{error}</p>}<button className="button dark wide">Continue to address <ArrowRight size={17} /></button></form></> : <><h2>Delivery address.</h2><p className="checkout-intro">Where should we send your order?</p><form onSubmit={beginPayment}><label>Door / flat number<input name="door" required autoComplete="address-line1" value={address.door} onChange={e => updateAddress('door', e.target.value)} placeholder="Flat 4B / Door 24" autoFocus /></label><label>Address line 1 <span className="required-note">Required</span><input name="address-line1" required autoComplete="address-line1" value={address.line1} onChange={e => updateAddress('line1', e.target.value)} placeholder="Street, area or locality" /></label><label>Address line 2 <span className="optional-note">Optional</span><input name="address-line2" autoComplete="address-line2" value={address.line2} onChange={e => updateAddress('line2', e.target.value)} placeholder="Landmark or nearby place" /></label><div className="address-grid"><label>City<input name="city" required autoComplete="address-level2" value={address.city} onChange={e => updateAddress('city', e.target.value)} placeholder="Chennai" /></label><label>PIN code<input name="pincode" required inputMode="numeric" autoComplete="postal-code" maxLength="6" pattern="[1-9][0-9]{5}" value={address.pincode} onChange={e => updateAddress('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="600001" /></label></div><div className="checkout-total"><span>Amount payable</span><strong>{money(total)}</strong></div>{error && <p className="form-error">{error}</p>}<div className="checkout-actions"><button className="button outline" type="button" disabled={submitting} onClick={() => { setStep('contact'); setError('') }}><ArrowLeft size={17} /> Back</button><button className="button dark" disabled={submitting}>{submitting ? 'Opening payment…' : 'Proceed to payment'} <ArrowRight size={17} /></button></div><p className="payment-note">Payments are securely processed by Razorpay.</p></form></>}
+  </div></div>
 }
 
 export default App
