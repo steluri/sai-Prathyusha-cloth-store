@@ -197,10 +197,6 @@ footer small { grid-column:1/-1; color:#83877f; border-top:1px solid #3c413a; pa
 .checkout-modal label { display:grid; gap:7px; font-size:11px; font-weight:600; }
 .checkout-modal input,.checkout-modal textarea { border:1px solid var(--line); background:white; padding:13px; outline:0; font-size:12px; resize:none; }
 .checkout-modal input:focus,.checkout-modal textarea:focus { border-color:var(--ink); }
-.mobile-input { display:flex; align-items:center; border:1px solid var(--line); background:white; }
-.mobile-input:focus-within { border-color:var(--ink); }
-.mobile-input span { padding:0 0 0 13px; color:var(--muted); font-size:12px; }
-.checkout-modal .mobile-input input { width:100%; border:0; }
 .otp-verified { margin:0; color:#39704d; font-size:12px; }
 .development-otp { margin:0; padding:10px 12px; background:var(--cream); color:var(--muted); font-size:12px; }
 .development-otp strong { color:var(--ink); letter-spacing:.08em; }
