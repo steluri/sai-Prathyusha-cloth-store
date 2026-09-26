@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Menu, Minus, Plus,
-  Search, ShoppingBag, Sparkles, Truck, X,
+  ArrowLeft, ArrowRight, Check, Heart, Menu, Search, ShoppingBag, X,
 } from 'lucide-react'
 import { apiUrl, assetUrl } from './api'
+import CollectionPage from './components/CollectionPage'
+import HomePage from './components/HomePage'
+import { CartItem, Count, Drawer, Empty } from './components/StoreUI'
+import { matchesCollection, mensCollections, womensCollections } from './data/collections'
+import { money } from './utils/format'
 
-const money = value => `₹${Number(value).toLocaleString('en-IN')}`
+const RAZORPAY_ENABLED = import.meta.env.VITE_ENABLE_RAZORPAY === 'true'
 
 let razorpayLoader
 function loadRazorpay() {
@@ -21,59 +25,6 @@ function loadRazorpay() {
     })
   }
   return razorpayLoader
-}
-
-const mensCollections = [
-  { name: 'Shirts', image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Jeans', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Trousers', image: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?auto=format&fit=crop&w=900&q=85' },
-  { name: 'T-shirts', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Kurtas', image: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Dhotis', image: 'https://images.unsplash.com/photo-1603252109303-2751441dd157?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Inners', image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Boys Collections', image: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&w=900&q=85' },
-  { name: 'All Products', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=85' },
-]
-
-const womensCollections = [
-  { name: 'Sarees', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Kurtis', image: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Dresses', image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Tops', image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Jeans', image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Chudidars', image: 'https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Inners', image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Girls Collections', image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=85' },
-  { name: 'All Products', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85' },
-]
-
-const collectionMatchers = {
-  Men: {
-    Shirts: /shirt|collar/i,
-    Jeans: /jean|denim/i,
-    Trousers: /trouser|pant/i,
-    'T-shirts': /t-shirt|tee|polo/i,
-    Kurtas: /kurta/i,
-    Dhotis: /dhoti/i,
-    Inners: /inner|brief|vest/i,
-    'Boys Collections': /boy|junior/i,
-  },
-  Women: {
-    Sarees: /saree/i,
-    Kurtis: /kurti|kurta|co-ord/i,
-    Dresses: /dress/i,
-    Tops: /top|shirt|blouse/i,
-    Jeans: /jean|denim/i,
-    Chudidars: /chudidar|salwar|trouser/i,
-    Inners: /inner|bra|lingerie/i,
-    'Girls Collections': /girl|junior/i,
-  },
-}
-
-function matchesCollection(product, audience, type) {
-  if (product.category !== audience) return false
-  if (type === 'All Products') return true
-  return collectionMatchers[audience]?.[type]?.test(`${product.name} ${product.description || ''}`) || false
 }
 
 function App() {
@@ -215,135 +166,45 @@ function App() {
         </div>
       </header>
 
-      {collectionView && <main className="collection-page">
-        <div className="catalog-layout">
-          <aside className="catalog-filters">
-            <div className="filter-heading"><strong>Filters</strong><button onClick={clearCatalogFilters}>Clear all</button></div>
-            <div className="filter-section price-filter">
-              <strong>Price</strong>
-              <div className="price-track"><span /><span /></div>
-              <div className="price-inputs">
-                <label>Minimum<input type="number" min="0" value={minimumPrice} onChange={e => setMinimumPrice(e.target.value)} placeholder="₹0" /></label>
-                <label>Maximum<input type="number" min="0" value={maximumPrice} onChange={e => setMaximumPrice(e.target.value)} placeholder="₹10000" /></label>
-              </div>
-            </div>
-            <div className="filter-section">
-              <strong>Color</strong>
-              <div className="filter-options">
-                {collectionColors.length ? collectionColors.map(color => <button className={selectedColor === color ? 'active' : ''} key={color} onClick={() => setSelectedColor(selectedColor === color ? '' : color)}><span />{color}</button>) : <p>No colors available</p>}
-              </div>
-            </div>
-            <div className="filter-section">
-              <strong>Offers</strong>
-              <label className="filter-check"><input type="checkbox" checked={saleOnly} onChange={e => setSaleOnly(e.target.checked)} /> On sale</label>
-            </div>
-            <div className="filter-summary-row"><span>Gender</span><strong>{collectionView.audience}</strong></div>
-            <div className="filter-summary-row"><span>Type</span><strong>{collectionView.type}</strong></div>
-          </aside>
+      {collectionView && <CollectionPage
+        collectionView={collectionView}
+        collectionTabs={collectionTabs}
+        collectionColors={collectionColors}
+        collectionProducts={collectionProducts}
+        wishlist={wishlist}
+        loading={loading}
+        sort={sort}
+        minimumPrice={minimumPrice}
+        maximumPrice={maximumPrice}
+        selectedColor={selectedColor}
+        saleOnly={saleOnly}
+        onBack={() => { setCollectionView(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+        onClearFilters={clearCatalogFilters}
+        onMinimumPriceChange={setMinimumPrice}
+        onMaximumPriceChange={setMaximumPrice}
+        onColorSelect={setSelectedColor}
+        onSaleOnlyChange={setSaleOnly}
+        onSortChange={setSort}
+        onOpenCollection={openCollection}
+        onToggleWishlist={toggleWishlist}
+        onAddToCart={addToCart}
+      />}
 
-          <section className="catalog-results">
-            <button className="collection-back" onClick={() => { setCollectionView(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }}><ArrowLeft size={17} /> Back to home</button>
-            <div className="shop-for">
-              <strong>Shop for</strong>
-              {['Women', 'Men'].map(audience => <button className={collectionView.audience === audience ? 'active' : ''} key={audience} onClick={() => openCollection(audience, 'All Products')}>{audience}</button>)}
-            </div>
-            <div className="catalog-query-row">
-              <p><strong>You searched for “{collectionView.type}”</strong><span>· {collectionProducts.length} products available</span></p>
-              <label className="catalog-sort"><strong>Sort by</strong><span><select value={sort} onChange={e => setSort(e.target.value)}><option>Featured</option><option>Newest</option><option>Price: Low to high</option><option>Price: High to low</option></select><ChevronDown size={16} /></span></label>
-            </div>
-            <div className="collection-type-tabs" role="tablist" aria-label={`${collectionView.audience} collection types`}>
-              {collectionTabs.map(item => <button role="tab" aria-selected={collectionView.type === item.name} className={collectionView.type === item.name ? 'active' : ''} key={item.name} onClick={() => openCollection(collectionView.audience, item.name)}>{item.name}</button>)}
-            </div>
-            {loading ? <div className="loading-grid">{Array.from({ length: 8 }).map((_, i) => <div className="skeleton" key={i} />)}</div> :
-              collectionProducts.length ? <div className="product-grid">
-                {collectionProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} onSave={() => toggleWishlist(product)} onAdd={() => addToCart(product)} />)}
-              </div> : <div className="empty-search"><Search size={28} /><h3>No products match these filters</h3><p>Clear the filters or choose another collection type.</p></div>}
-          </section>
-        </div>
-      </main>}
-
-      <main id="top" className={collectionView ? 'home-view-hidden' : ''}>
-        <section className="hero">
-          <img src="/atelier-hero.png" alt="Models wearing Pandu's warm neutral collection" />
-          <div className="hero-copy">
-            <p className="eyebrow">The September edit</p>
-            <h1>Everyday,<br /><em>considered.</em></h1>
-            <p>Natural textures, thoughtful shapes, and quietly confident pieces made to live in.</p>
-            <div className="hero-buttons">
-              <button className="button dark" onClick={() => shopCategory('Women')}>Shop women <ArrowRight size={17} /></button>
-              <button className="button text-button" onClick={() => shopCategory('Men')}>Shop men <ArrowRight size={17} /></button>
-            </div>
-          </div>
-          <div className="hero-note"><span>01</span><p>New forms<br />in soft focus</p></div>
-        </section>
-
-        <section className="values">
-          <div><Sparkles size={22} /><p><strong>Considered design</strong><span>Fewer, better pieces for every day.</span></p></div>
-          <div><Truck size={23} /><p><strong>Complimentary delivery</strong><span>On all orders over ₹2,999.</span></p></div>
-          <div><Check size={22} /><p><strong>Easy returns</strong><span>14 days to change your mind.</span></p></div>
-        </section>
-
-        <section className="collection" id="shop">
-          <div className="section-heading">
-            <div><p className="eyebrow">Curated for now</p><h2>The new collection</h2></div>
-            <p>Clean lines meet lived-in comfort. Discover pieces that work wherever the day takes you.</p>
-          </div>
-          <div className="toolbar">
-            <div className="category-tabs">
-              {['All', 'Women', 'Men'].map(item => <button key={item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}
-            </div>
-            <label className="sort">Sort by <select value={sort} onChange={e => setSort(e.target.value)}><option>Featured</option><option>Newest</option><option>Price: Low to high</option><option>Price: High to low</option></select><ChevronDown size={15} /></label>
-          </div>
-
-          {loading ? <div className="loading-grid">{Array.from({ length: 8 }).map((_, i) => <div className="skeleton" key={i} />)}</div> :
-            visibleProducts.length ? <div className="product-grid">
-              {visibleProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} onSave={() => toggleWishlist(product)} onAdd={() => addToCart(product)} />)}
-            </div> : <div className="empty-search"><Search size={28} /><h3>No pieces found</h3><p>Try a different search or category.</p></div>}
-        </section>
-
-        <section className="mens-collections womens-collections" aria-labelledby="womens-collections-title">
-          <div className="mens-collections-heading">
-            <div>
-              <p className="eyebrow">Made for every moment</p>
-              <h2 id="womens-collections-title">Womens Collections</h2>
-            </div>
-            <p>From everyday favourites to festive silhouettes, discover styles selected for women and girls.</p>
-          </div>
-          <div className="mens-collection-grid">
-            {womensCollections.map(item => (
-              <button className="mens-collection-card" key={item.name} onClick={() => openCollection('Women', item.name)}>
-                <span className="mens-collection-image"><img src={item.image} alt="" loading="lazy" /></span>
-                <span>{item.name}<ArrowRight size={17} /></span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="mens-collections" aria-labelledby="mens-collections-title">
-          <div className="mens-collections-heading">
-            <div>
-              <p className="eyebrow">Find your style</p>
-              <h2 id="mens-collections-title">Mens Collections</h2>
-            </div>
-            <p>Everyday essentials and traditional favourites, thoughtfully selected for men and boys.</p>
-          </div>
-          <div className="mens-collection-grid">
-            {mensCollections.map(item => (
-              <button className="mens-collection-card" key={item.name} onClick={() => openCollection('Men', item.name)}>
-                <span className="mens-collection-image"><img src={item.image} alt="" loading="lazy" /></span>
-                <span>{item.name}<ArrowRight size={17} /></span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="story">
-          <div className="story-image"><div className="material-card"><span>01</span><strong>Natural fibres</strong><p>Breathable, tactile, enduring.</p></div></div>
-          <div className="story-copy"><p className="eyebrow">Our point of view</p><h2>Made with intention.<br /><em>Worn with ease.</em></h2><p>We believe getting dressed should feel simple. That means considered silhouettes, honest materials, and a palette that moves effortlessly through your wardrobe.</p><button className="button outline" onClick={() => shopCategory('All')}>Discover our story <ArrowRight size={17} /></button></div>
-        </section>
-
-        <section className="newsletter"><p className="eyebrow">Stay in the know</p><h2>Notes from the studio</h2><p>New arrivals, quiet inspiration, and 10% off your first order.</p><form onSubmit={e => { e.preventDefault(); notify('Welcome to the Pandu community') }}><input type="email" required placeholder="Your email address" /><button aria-label="Subscribe"><ArrowRight /></button></form></section>
-      </main>
+      <HomePage
+        collectionView={collectionView}
+        category={category}
+        sort={sort}
+        loading={loading}
+        visibleProducts={visibleProducts}
+        wishlist={wishlist}
+        onCategoryChange={setCategory}
+        onSortChange={setSort}
+        onShopCategory={shopCategory}
+        onOpenCollection={openCollection}
+        onToggleWishlist={toggleWishlist}
+        onAddToCart={addToCart}
+        onSubscribe={() => notify('Welcome to the Pandu community')}
+      />
 
       <footer><a className="logo" href="#top" onClick={() => setCollectionView(null)}>Pandu<span>.</span></a><p>Clothes for living, thoughtfully made.</p><div><a href="#shop" onClick={() => setCollectionView(null)}>Shop</a><a href="#top" onClick={() => setCollectionView(null)}>About</a><a href="mailto:hello@Pandu.store">Contact</a></div><small>© 2026 Pandu Studio</small></footer>
 
@@ -364,29 +225,16 @@ function App() {
   )
 }
 
-function Count({ value }) { return value ? <span className="count">{value}</span> : null }
-
-function ProductCard({ product, saved, onSave, onAdd }) {
-  return <article className="product-card">
-    <div className="product-image"><img src={assetUrl(product.image)} alt={product.name} loading="lazy" />{product.badge && <span className="badge">{product.badge}</span>}<button className={`save ${saved ? 'saved' : ''}`} onClick={onSave} aria-label="Save to wishlist"><Heart size={19} fill={saved ? 'currentColor' : 'none'} /></button><button className="quick-add" onClick={onAdd}>Quick add <Plus size={16} /></button></div>
-    <div className="product-info"><div><h3>{product.name}</h3><p>{product.color}</p></div><div className="price"><strong>{money(product.price)}</strong>{product.old_price && <s>{money(product.old_price)}</s>}</div></div>
-  </article>
-}
-
-function Drawer({ open, onClose, title, count, children }) {
-  return <div className={`drawer-wrap ${open ? 'show' : ''}`} aria-hidden={!open}><button className="scrim" onClick={onClose} aria-label="Close" /><aside className="drawer"><div className="drawer-head"><h2>{title} <span>{count}</span></h2><button className="icon-btn" onClick={onClose}><X /></button></div>{children}</aside></div>
-}
-
-function CartItem({ item, onChange }) {
-  return <div className="cart-item"><img src={assetUrl(item.image)} alt={item.name} /><div><h4>{item.name}</h4><p>{item.color} · One size</p><strong>{money(item.price)}</strong><div className="quantity"><button onClick={() => onChange(-1)}><Minus size={13} /></button><span>{item.quantity}</span><button onClick={() => onChange(1)}><Plus size={13} /></button></div></div><button className="remove" onClick={() => onChange(-item.quantity)}><X size={16} /></button></div>
-}
-
-function Empty({ icon, title, text, action }) { return <div className="empty">{icon}<h3>{title}</h3><p>{text}</p><button className="button dark" onClick={action}>Explore collection</button></div> }
-
 function Checkout({ total, cart, onClose, onComplete }) {
   const [step, setStep] = useState('contact')
   const [name, setName] = useState('')
   const [mobile, setMobile] = useState('')
+  const [otpChallengeId, setOtpChallengeId] = useState('')
+  const [otp, setOtp] = useState('')
+  const [developmentOtp, setDevelopmentOtp] = useState('')
+  const [verificationToken, setVerificationToken] = useState('')
+  const [sendingOtp, setSendingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [address, setAddress] = useState({ door: '', line1: '', line2: '', city: '', pincode: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -403,12 +251,18 @@ function Checkout({ total, cart, onClose, onComplete }) {
   }
 
   async function beginPayment(e) {
-    e.preventDefault(); setSubmitting(true); setError('')
+    e.preventDefault(); setError('')
+    if (!RAZORPAY_ENABLED) {
+      setError('Online checkout is currently unavailable.')
+      return
+    }
+    setSubmitting(true)
     try {
       await loadRazorpay()
       const paymentOrder = await request('/api/payments/razorpay/order', {
         customer: name,
         mobile,
+        verification_token: verificationToken,
         address,
         items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
       })
@@ -457,12 +311,39 @@ function Checkout({ total, cart, onClose, onComplete }) {
     } catch (err) { setError(err.message || 'Checkout failed. Please try again.'); setSubmitting(false) }
   }
 
+  async function sendOtp() {
+    setSendingOtp(true); setError('')
+    try {
+      const result = await request('/api/otp/send', { mobile })
+      setOtpChallengeId(result.challenge_id)
+      setOtp('')
+      setDevelopmentOtp(result.development_otp || '')
+      setVerificationToken('')
+    } catch (err) {
+      setError(err.message || 'Could not send verification code.')
+    } finally {
+      setSendingOtp(false)
+    }
+  }
+
+  async function verifyOtp() {
+    setVerifyingOtp(true); setError('')
+    try {
+      const result = await request('/api/otp/verify', { challenge_id: otpChallengeId, otp })
+      setVerificationToken(result.verification_token)
+    } catch (err) {
+      setError(err.message || 'Could not verify that code.')
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }
+
   function updateAddress(field, value) {
     setAddress(current => ({ ...current, [field]: value }))
   }
 
   return <div className="modal-wrap"><button className="scrim" onClick={onClose} aria-label="Close checkout" /><div className="checkout-modal"><button className="modal-close" onClick={onClose} aria-label="Close checkout"><X /></button><p className="eyebrow">Secure checkout · {step === 'contact' ? 'Step 1 of 2' : 'Step 2 of 2'}</p>
-    {step === 'contact' ? <><h2>Your details.</h2><p className="checkout-intro">Tell us who the order is for.</p><form onSubmit={e => { e.preventDefault(); setError(''); setStep('address') }}><label>Full name<input name="name" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></label><label>Mobile number<div className="mobile-input"><span>+91</span><input name="mobile" type="tel" inputMode="numeric" autoComplete="tel" required maxLength="10" pattern="[6-9][0-9]{9}" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="98765 43210" /></div></label>{error && <p className="form-error">{error}</p>}<button className="button dark wide">Continue to address <ArrowRight size={17} /></button></form></> : <><h2>Delivery address.</h2><p className="checkout-intro">Where should we send your order?</p><form onSubmit={beginPayment}><label>Door / flat number<input name="door" required autoComplete="address-line1" value={address.door} onChange={e => updateAddress('door', e.target.value)} placeholder="Flat 4B / Door 24" autoFocus /></label><label>Address line 1 <span className="required-note">Required</span><input name="address-line1" required autoComplete="address-line1" value={address.line1} onChange={e => updateAddress('line1', e.target.value)} placeholder="Street, area or locality" /></label><label>Address line 2 <span className="optional-note">Optional</span><input name="address-line2" autoComplete="address-line2" value={address.line2} onChange={e => updateAddress('line2', e.target.value)} placeholder="Landmark or nearby place" /></label><div className="address-grid"><label>City<input name="city" required autoComplete="address-level2" value={address.city} onChange={e => updateAddress('city', e.target.value)} placeholder="Chennai" /></label><label>PIN code<input name="pincode" required inputMode="numeric" autoComplete="postal-code" maxLength="6" pattern="[1-9][0-9]{5}" value={address.pincode} onChange={e => updateAddress('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="600001" /></label></div><div className="checkout-total"><span>Amount payable</span><strong>{money(total)}</strong></div>{error && <p className="form-error">{error}</p>}<div className="checkout-actions"><button className="button outline" type="button" disabled={submitting} onClick={() => { setStep('contact'); setError('') }}><ArrowLeft size={17} /> Back</button><button className="button dark" disabled={submitting}>{submitting ? 'Opening payment…' : 'Proceed to payment'} <ArrowRight size={17} /></button></div><p className="payment-note">Payments are securely processed by Razorpay.</p></form></>}
+    {step === 'contact' ? <><h2>Your details.</h2><p className="checkout-intro">Tell us who the order is for.</p><form onSubmit={e => { e.preventDefault(); if (verificationToken) { setError(''); setStep('address') } }}><label>Full name<input name="name" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></label><label>Mobile number<div className="mobile-input"><span>+91</span><input name="mobile" type="tel" inputMode="numeric" autoComplete="tel" required maxLength="10" pattern="[6-9][0-9]{9}" value={mobile} onChange={e => { setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpChallengeId(''); setOtp(''); setDevelopmentOtp(''); setVerificationToken('') }} placeholder="98765 43210" /></div></label>{otpChallengeId && !verificationToken && <label>Verification code<input name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength="6" pattern="[0-9]{6}" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" /></label>}{developmentOtp && <p className="development-otp">Development OTP: <strong>{developmentOtp}</strong></p>}{verificationToken && <p className="otp-verified">Mobile number verified</p>}{error && <p className="form-error">{error}</p>}{!otpChallengeId ? <button className="button dark wide" type="button" disabled={sendingOtp || mobile.length !== 10 || !name.trim()} onClick={sendOtp}>{sendingOtp ? 'Sending code…' : 'Send verification code'}</button> : !verificationToken ? <><button className="button dark wide" type="button" disabled={verifyingOtp || otp.length !== 6} onClick={verifyOtp}>{verifyingOtp ? 'Verifying…' : 'Verify mobile number'}</button><button className="otp-resend" type="button" disabled={sendingOtp} onClick={sendOtp}>{sendingOtp ? 'Sending code…' : 'Resend code'}</button></> : <button className="button dark wide">Continue to address <ArrowRight size={17} /></button>}</form></> : <><h2>Delivery address.</h2><p className="checkout-intro">Where should we send your order?</p><form onSubmit={beginPayment}><label>Door / flat number<input name="door" required autoComplete="address-line1" value={address.door} onChange={e => updateAddress('door', e.target.value)} placeholder="Flat 4B / Door 24" autoFocus /></label><label>Address line 1 <span className="required-note">Required</span><input name="address-line1" required autoComplete="address-line1" value={address.line1} onChange={e => updateAddress('line1', e.target.value)} placeholder="Street, area or locality" /></label><label>Address line 2 <span className="optional-note">Optional</span><input name="address-line2" autoComplete="address-line2" value={address.line2} onChange={e => updateAddress('line2', e.target.value)} placeholder="Landmark or nearby place" /></label><div className="address-grid"><label>City<input name="city" required autoComplete="address-level2" value={address.city} onChange={e => updateAddress('city', e.target.value)} placeholder="Chennai" /></label><label>PIN code<input name="pincode" required inputMode="numeric" autoComplete="postal-code" maxLength="6" pattern="[1-9][0-9]{5}" value={address.pincode} onChange={e => setAddress(current => ({ ...current, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))} placeholder="600001" /></label></div><div className="checkout-total"><span>Amount payable</span><strong>{money(total)}</strong></div>{error && <p className="form-error">{error}</p>}<div className="checkout-actions"><button className="button outline" type="button" disabled={submitting} onClick={() => { setStep('contact'); setError('') }}><ArrowLeft size={17} /> Back</button><button className="button dark" disabled={submitting}>{submitting ? 'Opening payment…' : 'Proceed to payment'} <ArrowRight size={17} /></button></div><p className="payment-note">Payments are securely processed by Razorpay.</p></form></>}
   </div></div>
 }
 
