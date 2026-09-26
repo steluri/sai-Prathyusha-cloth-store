@@ -7,12 +7,7 @@ export default function EmailCheckout({ total, cart, onClose, onComplete, razorp
   const [step, setStep] = useState('contact')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [otpChallengeId, setOtpChallengeId] = useState('')
-  const [otp, setOtp] = useState('')
-  const [developmentOtp, setDevelopmentOtp] = useState('')
-  const [verificationToken, setVerificationToken] = useState('')
-  const [sendingOtp, setSendingOtp] = useState(false)
-  const [verifyingOtp, setVerifyingOtp] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
   const [address, setAddress] = useState({ door: '', line1: '', line2: '', city: '', pincode: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -28,44 +23,20 @@ export default function EmailCheckout({ total, cart, onClose, onComplete, razorp
     return data
   }
 
-  function clearVerification() {
-    setOtpChallengeId('')
-    setOtp('')
-    setDevelopmentOtp('')
-    setVerificationToken('')
-  }
-
-  async function sendOtp() {
-    setSendingOtp(true)
+  async function sendTestEmail() {
+    setSendingEmail(true)
     setError('')
     try {
-      const result = await request('/api/send-email', {
-        name,
+      await request('/api/send-email', {
         email,
-        subject: 'OTP for verification',
-        message: '{otp} for the verification, do not share with anyone',
+        subject: 'Test Email',
+        message: 'Hello from my Flask application using Amazon SES.',
       })
-      setOtpChallengeId(result.challenge_id)
-      setOtp('')
-      setDevelopmentOtp(result.development_otp || '')
-      setVerificationToken('')
+      setStep('address')
     } catch (err) {
-      setError(err.message || 'Could not send verification code.')
+      setError(err.message || 'Could not send the test email.')
     } finally {
-      setSendingOtp(false)
-    }
-  }
-
-  async function verifyOtp() {
-    setVerifyingOtp(true)
-    setError('')
-    try {
-      const result = await request('/api/otp/verify', { challenge_id: otpChallengeId, otp })
-      setVerificationToken(result.verification_token)
-    } catch (err) {
-      setError(err.message || 'Could not verify that code.')
-    } finally {
-      setVerifyingOtp(false)
+      setSendingEmail(false)
     }
   }
 
@@ -86,7 +57,6 @@ export default function EmailCheckout({ total, cart, onClose, onComplete, razorp
       const paymentOrder = await request('/api/payments/razorpay/order', {
         customer: name,
         email,
-        verification_token: verificationToken,
         address,
         items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
       })
@@ -142,14 +112,11 @@ export default function EmailCheckout({ total, cart, onClose, onComplete, razorp
           <>
             <h2>Your details.</h2>
             <p className="checkout-intro">Tell us who the order is for.</p>
-            <form onSubmit={event => { event.preventDefault(); if (verificationToken) { setError(''); setStep('address') } }}>
+            <form onSubmit={event => event.preventDefault()}>
               <label>Full name<input name="name" required autoComplete="name" value={name} onChange={event => setName(event.target.value)} placeholder="Your name" /></label>
-              <label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={event => { setEmail(event.target.value); clearVerification() }} placeholder="you@example.com" /></label>
-              {otpChallengeId && !verificationToken && <label>Email verification code<input name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" required maxLength="6" pattern="[0-9]{6}" value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" /></label>}
-              {developmentOtp && <p className="development-otp">Development OTP: <strong>{developmentOtp}</strong></p>}
-              {verificationToken && <p className="otp-verified">Email address verified</p>}
+              <label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" /></label>
               {error && <p className="form-error">{error}</p>}
-              {!otpChallengeId ? <button className="button dark wide" type="button" disabled={sendingOtp || !email.includes('@') || !name.trim()} onClick={sendOtp}>{sendingOtp ? 'Sending code…' : 'Send email verification code'}</button> : !verificationToken ? <><button className="button dark wide" type="button" disabled={verifyingOtp || otp.length !== 6} onClick={verifyOtp}>{verifyingOtp ? 'Verifying…' : 'Verify email address'}</button><button className="otp-resend" type="button" disabled={sendingOtp} onClick={sendOtp}>{sendingOtp ? 'Sending code…' : 'Resend code'}</button></> : <button className="button dark wide">Continue to address <ArrowRight size={17} /></button>}
+              <button className="button dark wide" type="button" disabled={sendingEmail || !email.includes('@') || !name.trim()} onClick={sendTestEmail}>{sendingEmail ? 'Sending email…' : 'Send test email and continue'} <ArrowRight size={17} /></button>
             </form>
           </>
         ) : (
