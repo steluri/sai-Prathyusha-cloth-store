@@ -29,7 +29,7 @@ export function OrdersSection({ orders, loading, onStatusChange, onRefresh }) {
           </div>
           <div className="order-customer">
             <strong>{order.customer}</strong>
-            <span>{order.mobile}</span>
+            <span>{order.email}</span>
             <span>{order.address || 'No address recorded'}</span>
           </div>
           <div className="order-items">
