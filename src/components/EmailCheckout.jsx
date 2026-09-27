@@ -19,7 +19,12 @@ export default function EmailCheckout({ total, cart, onClose, onComplete, razorp
       body: JSON.stringify(body),
     })
     const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
+    if (!response.ok) {
+      const detail = data.error_message
+        ? `${data.error_message} (HTTP ${data.status_code || response.status})`
+        : data.error || `Request failed (HTTP ${response.status}).`
+      throw new Error(detail)
+    }
     return data
   }
 
