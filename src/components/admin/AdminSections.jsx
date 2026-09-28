@@ -129,6 +129,10 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       })
+      if (response.status === 401) {
+        onUnauthorized()
+        return
+      }
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || `Could not upload ${image.file.name}.`)
       if (typeof data.path !== 'string' || !data.path) throw new Error('The upload response did not include an image path.')

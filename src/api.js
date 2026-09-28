@@ -8,7 +8,10 @@ export function apiUrl(path) {
 }
 
 export function assetUrl(path) {
-  if (!path || /^(?:https?:)?\/\//.test(path) || path.startsWith('data:')) return path
+  if (!path) return path
+  const s3Url = s3AssetUrl(path)
+  if (s3Url) return s3Url
+  if (/^(?:https?:)?\/\//.test(path) || path.startsWith('data:')) return path
   return apiUrl(path)
 }
 
