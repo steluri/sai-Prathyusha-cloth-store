@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ImagePlus, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { apiUrl, assetUrl } from '../../api'
 import { money } from '../../utils/format'
 
@@ -13,6 +13,7 @@ const IMAGE_SLOTS = [
 ]
 
 const ORDER_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+let imageUploadSequence = 0
 
 export function OrdersSection({ orders, loading, onStatusChange, onRefresh }) {
   if (loading) return <p className="admin-empty">Loading orders…</p>
@@ -73,17 +74,29 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
   const isEditing = Boolean(product)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [frontPreview, setFrontPreview] = useState('')
+  const [frontUpload, setFrontUpload] = useState(null)
   const [additionalFiles, setAdditionalFiles] = useState([])
   const additionalInput = useRef(null)
   const objectUrls = useRef(new Set())
+  const stagedImagePaths = useRef(new Set())
   const optionalSlots = IMAGE_SLOTS.slice(1)
   const availableOptionalSlots = optionalSlots.filter(slot => !product?.[`image_${slot.key}`])
   const maximumAdditionalImages = availableOptionalSlots.length
+  const primaryImageReady = frontUpload
+    ? frontUpload.status === 'uploaded'
+    : Boolean(product?.image_front || product?.image)
+  const uploadsReady = primaryImageReady && additionalFiles.every(image => image.status === 'uploaded')
 
   useEffect(() => () => {
     objectUrls.current.forEach(url => URL.revokeObjectURL(url))
-  }, [])
+    stagedImagePaths.current.forEach(path => {
+      fetch(apiUrl('/api/admin/product-images'), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      }).catch(() => {})
+    })
+  }, [token])
 
   function createPreview(file) {
     const url = URL.createObjectURL(file)
@@ -97,10 +110,60 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
     objectUrls.current.delete(url)
   }
 
+  function updateImageState(setter, imageId, updates) {
+    setter(current => {
+      if (Array.isArray(current)) {
+        return current.map(image => image.id === imageId ? { ...image, ...updates } : image)
+      }
+      return current?.id === imageId ? { ...current, ...updates } : current
+    })
+  }
+
+  async function uploadImage(image, slot, updateImage) {
+    const formData = new FormData()
+    formData.append('file', image.file)
+    formData.append('slot', slot)
+    try {
+      const response = await fetch(apiUrl('/api/admin/product-images'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || `Could not upload ${image.file.name}.`)
+      if (typeof data.path !== 'string' || !data.path) throw new Error('The upload response did not include an image path.')
+      stagedImagePaths.current.add(data.path)
+      updateImageState(updateImage, image.id, { path: data.path, status: 'uploaded' })
+    } catch (uploadError) {
+      updateImageState(updateImage, image.id, { status: 'failed', error: uploadError.message })
+      notify(uploadError.message || `Could not upload ${image.file.name}.`)
+    }
+  }
+
+  async function discardStagedImage(path) {
+    if (!path) return
+    stagedImagePaths.current.delete(path)
+    try {
+      await fetch(apiUrl('/api/admin/product-images'), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      })
+    } catch {
+      notify('Could not remove the staged image from storage.')
+    }
+  }
+
   function onFrontFileChange(event) {
-    releasePreview(frontPreview)
     const file = event.target.files?.[0]
-    setFrontPreview(file ? createPreview(file) : '')
+    event.target.value = ''
+    if (!file) return
+    releasePreview(frontUpload?.preview)
+    if (frontUpload?.path) void discardStagedImage(frontUpload.path)
+    const image = { id: ++imageUploadSequence, file, preview: createPreview(file), path: '', status: 'uploading' }
+    setFrontUpload(image)
+    setError('')
+    void uploadImage(image, 'front', setFrontUpload)
   }
 
   function onAdditionalFilesChange(event) {
@@ -112,23 +175,42 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
       return
     }
     setError('')
-    const selectedFiles = files.map(file => ({ file, preview: createPreview(file) }))
+    const selectedFiles = files.map((file, index) => ({
+      id: ++imageUploadSequence,
+      file,
+      slot: availableOptionalSlots[additionalFiles.length + index].key,
+      preview: createPreview(file),
+      path: '',
+      status: 'uploading',
+    }))
     setAdditionalFiles(current => [...current, ...selectedFiles])
+    selectedFiles.forEach(image => { void uploadImage(image, image.slot, setAdditionalFiles) })
   }
 
   function removeAdditionalFile(index) {
-    releasePreview(additionalFiles[index]?.preview)
+    const image = additionalFiles[index]
+    if (image?.status === 'uploading') return
+    releasePreview(image?.preview)
+    if (image?.path) void discardStagedImage(image.path)
     setAdditionalFiles(current => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
   async function submit(event) {
     event.preventDefault()
+    if (!uploadsReady) {
+      setError('Wait for all selected images to finish uploading before saving.')
+      return
+    }
     setSubmitting(true)
     setError('')
     const form = event.currentTarget
     const formData = new FormData(form)
+    formData.delete('front')
+    formData.delete('front_path')
     formData.delete('additional_images')
-    additionalFiles.forEach(({ file }) => formData.append('additional_images', file))
+    formData.delete('additional_image_paths')
+    if (frontUpload?.path) formData.set('front_path', frontUpload.path)
+    additionalFiles.forEach(image => formData.append('additional_image_paths', image.path))
     try {
       const response = await fetch(apiUrl(`/api/admin/products${isEditing ? `/${product.id}` : ''}`), {
         method: isEditing ? 'PUT' : 'POST',
@@ -141,12 +223,14 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
       }
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
+      if (!Number.isInteger(data.id)) throw new Error('The save response did not include a product ID.')
+      stagedImagePaths.current.clear()
       form.reset()
-      releasePreview(frontPreview)
+      releasePreview(frontUpload?.preview)
       additionalFiles.forEach(({ preview }) => releasePreview(preview))
-      setFrontPreview('')
+      setFrontUpload(null)
       setAdditionalFiles([])
-      onSaved()
+      onSaved(data.id)
     } catch (submitError) {
       setError(submitError.message || 'Could not save product. Please try again.')
       notify(submitError.message || 'Could not save product')
@@ -169,16 +253,19 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
       <h3 className="admin-section-title">Product images</h3>
       <div className="admin-image-grid">
         <label className="admin-image-slot">
-          <input type="file" name="front" accept="image/png,image/jpeg,image/webp" required={!isEditing && !product?.image_front}
+          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={submitting || frontUpload?.status === 'uploading'}
             onChange={onFrontFileChange} />
-          <div className="admin-image-preview">
-            {frontPreview
-              ? <img src={frontPreview} alt="Primary product preview" />
+          <div className={`admin-image-preview${frontUpload?.status === 'uploading' ? ' is-uploading' : ''}`}>
+            {frontUpload?.preview
+              ? <img src={frontUpload.preview} alt="Primary product preview" />
               : product?.image_front || product?.image
                 ? <img src={assetUrl(product.image_front || product.image)} alt="Primary product" />
                 : <ImagePlus size={22} />}
+            {frontUpload?.status === 'uploading' && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />Uploading to S3</span>}
           </div>
           <span>Primary image · Required</span>
+          {frontUpload?.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
+          {frontUpload?.status === 'failed' && <span className="admin-image-upload-status error">{frontUpload.error}</span>}
         </label>
         {optionalSlots.map(slot => product?.[`image_${slot.key}`] && (
           <div className="admin-image-slot" key={slot.key}>
@@ -186,18 +273,23 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
             <span>{slot.label}</span>
           </div>
         ))}
-        {additionalFiles.map(({ file, preview }, index) => (
-          <div className="admin-image-slot admin-image-selected" key={`${file.name}-${index}`}>
-            <div className="admin-image-preview"><img src={preview} alt={file.name} /></div>
-            <span>{file.name}</span>
-            <button type="button" className="admin-image-remove" aria-label={`Remove ${file.name}`} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
+        {additionalFiles.map((image, index) => (
+          <div className="admin-image-slot admin-image-selected" key={image.id}>
+            <div className={`admin-image-preview${image.status === 'uploading' ? ' is-uploading' : ''}`}>
+              <img src={image.preview} alt={image.file.name} />
+              {image.status === 'uploading' && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />Uploading to S3</span>}
+            </div>
+            <span>{image.file.name}</span>
+            {image.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
+            {image.status === 'failed' && <span className="admin-image-upload-status error">{image.error}</span>}
+            <button type="button" className="admin-image-remove" aria-label={`Remove ${image.file.name}`} disabled={image.status === 'uploading' || submitting} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
           </div>
         ))}
         {additionalFiles.length < maximumAdditionalImages && (
           <>
             <input ref={additionalInput} className="admin-image-multiple-input" type="file" name="additional_images"
               accept="image/png,image/jpeg,image/webp" multiple onChange={onAdditionalFilesChange} />
-            <button type="button" className="admin-image-add-button" onClick={() => additionalInput.current?.click()}>
+            <button type="button" className="admin-image-add-button" disabled={submitting} onClick={() => additionalInput.current?.click()}>
               <Plus size={20} />
               <span>Add optional images</span>
             </button>
@@ -205,8 +297,8 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
         )}
       </div>
       {error && <p className="form-error">{error}</p>}
-      <button className="button dark wide" disabled={submitting}>
-        {submitting ? 'Saving…' : isEditing ? 'Save changes' : 'Add product'}
+      <button className="button dark wide" disabled={submitting || !uploadsReady}>
+        {submitting ? 'Saving product…' : isEditing ? 'Save changes' : 'Add product'}
       </button>
     </form>
   )

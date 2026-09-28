@@ -154,7 +154,7 @@ function AdminDashboard({ token, onLogout }) {
               token={token}
               product={editingProduct}
               onUnauthorized={onLogout}
-              onSaved={() => { notify(editingProduct ? 'Product updated' : 'Product added'); setEditingProduct(null); loadProducts(); setTab('products') }}
+              onSaved={productId => { notify(editingProduct ? `Product ${productId} updated` : `Product ${productId} added`); setEditingProduct(null); loadProducts(); setTab('products') }}
               notify={notify}
             />}
       </main>

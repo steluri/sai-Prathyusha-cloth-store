@@ -1,6 +1,23 @@
 import { Heart, Minus, Plus, X } from 'lucide-react'
-import { assetUrl } from '../api'
+import { assetUrl, s3AssetUrl } from '../api'
 import { money } from '../utils/format'
+
+function retryProductImageFromS3(event, product) {
+  const image = event.currentTarget
+  if (image.dataset.s3Retry === 'true') return
+  image.dataset.s3Retry = 'true'
+  const candidates = [
+    product.image_front,
+    product.image,
+    product.image_back,
+    product.image_side,
+    product.image_closeup,
+    product.image_model,
+    product.image_fit,
+  ].map(s3AssetUrl).filter(Boolean)
+  const fallback = candidates.find(url => new URL(url, window.location.href).href !== image.currentSrc)
+  if (fallback) image.src = fallback
+}
 
 export function Count({ value }) {
   return value ? <span className="count">{value}</span> : null
@@ -9,7 +26,7 @@ export function Count({ value }) {
 export function ProductCard({ product, saved, onSave, onAdd }) {
   return <article className="product-card">
     <div className="product-image">
-      <img src={assetUrl(product.image)} alt={product.name} loading="lazy" />
+      <img src={assetUrl(product.image_front || product.image)} alt={product.name} loading="lazy" onError={event => retryProductImageFromS3(event, product)} />
       {product.badge && <span className="badge">{product.badge}</span>}
       <button className={`save ${saved ? 'saved' : ''}`} onClick={onSave} aria-label="Save to wishlist">
         <Heart size={19} fill={saved ? 'currentColor' : 'none'} />
