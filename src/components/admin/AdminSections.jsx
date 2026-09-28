@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ImagePlus, Pencil, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { apiUrl, assetUrl } from '../../api'
 import { money } from '../../utils/format'
 
@@ -73,10 +73,52 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
   const isEditing = Boolean(product)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [previews, setPreviews] = useState({})
+  const [frontPreview, setFrontPreview] = useState('')
+  const [additionalFiles, setAdditionalFiles] = useState([])
+  const additionalInput = useRef(null)
+  const objectUrls = useRef(new Set())
+  const optionalSlots = IMAGE_SLOTS.slice(1)
+  const availableOptionalSlots = optionalSlots.filter(slot => !product?.[`image_${slot.key}`])
+  const maximumAdditionalImages = availableOptionalSlots.length
 
-  function onFileChange(key, file) {
-    setPreviews(current => ({ ...current, [key]: file ? URL.createObjectURL(file) : undefined }))
+  useEffect(() => () => {
+    objectUrls.current.forEach(url => URL.revokeObjectURL(url))
+  }, [])
+
+  function createPreview(file) {
+    const url = URL.createObjectURL(file)
+    objectUrls.current.add(url)
+    return url
+  }
+
+  function releasePreview(url) {
+    if (!url) return
+    URL.revokeObjectURL(url)
+    objectUrls.current.delete(url)
+  }
+
+  function onFrontFileChange(event) {
+    releasePreview(frontPreview)
+    const file = event.target.files?.[0]
+    setFrontPreview(file ? createPreview(file) : '')
+  }
+
+  function onAdditionalFilesChange(event) {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length) return
+    if (files.length + additionalFiles.length > maximumAdditionalImages) {
+      setError(`You can add up to ${maximumAdditionalImages} optional images for this product.`)
+      return
+    }
+    setError('')
+    const selectedFiles = files.map(file => ({ file, preview: createPreview(file) }))
+    setAdditionalFiles(current => [...current, ...selectedFiles])
+  }
+
+  function removeAdditionalFile(index) {
+    releasePreview(additionalFiles[index]?.preview)
+    setAdditionalFiles(current => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
   async function submit(event) {
@@ -85,6 +127,8 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
     setError('')
     const form = event.currentTarget
     const formData = new FormData(form)
+    formData.delete('additional_images')
+    additionalFiles.forEach(({ file }) => formData.append('additional_images', file))
     try {
       const response = await fetch(apiUrl(`/api/admin/products${isEditing ? `/${product.id}` : ''}`), {
         method: isEditing ? 'PUT' : 'POST',
@@ -98,7 +142,10 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
       form.reset()
-      setPreviews({})
+      releasePreview(frontPreview)
+      additionalFiles.forEach(({ preview }) => releasePreview(preview))
+      setFrontPreview('')
+      setAdditionalFiles([])
       onSaved()
     } catch (submitError) {
       setError(submitError.message || 'Could not save product. Please try again.')
@@ -119,20 +166,43 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
         <label>Badge (optional)<input name="badge" defaultValue={product?.badge ?? ''} placeholder="New / Bestseller / Limited" /></label>
       </div>
       <label className="admin-textarea">Description<textarea name="description" required defaultValue={product?.description} placeholder="A breezy linen-blend shirt with an easy, oversized silhouette." /></label>
-      <h3 className="admin-section-title">Product images{isEditing && ' (leave a slot empty to keep the current image)'}</h3>
+      <h3 className="admin-section-title">Product images</h3>
       <div className="admin-image-grid">
-        {IMAGE_SLOTS.map(slot => (
-          <label className="admin-image-slot" key={slot.key}>
-            <input type="file" name={slot.key} accept="image/png,image/jpeg,image/webp" required={!isEditing}
-              onChange={event => onFileChange(slot.key, event.target.files?.[0])} />
-            <div className="admin-image-preview">
-              {previews[slot.key]
-                ? <img src={previews[slot.key]} alt={slot.label} />
-                : product?.[`image_${slot.key}`] ? <img src={assetUrl(product[`image_${slot.key}`])} alt={slot.label} /> : <ImagePlus size={22} />}
-            </div>
+        <label className="admin-image-slot">
+          <input type="file" name="front" accept="image/png,image/jpeg,image/webp" required={!isEditing && !product?.image_front}
+            onChange={onFrontFileChange} />
+          <div className="admin-image-preview">
+            {frontPreview
+              ? <img src={frontPreview} alt="Primary product preview" />
+              : product?.image_front || product?.image
+                ? <img src={assetUrl(product.image_front || product.image)} alt="Primary product" />
+                : <ImagePlus size={22} />}
+          </div>
+          <span>Primary image · Required</span>
+        </label>
+        {optionalSlots.map(slot => product?.[`image_${slot.key}`] && (
+          <div className="admin-image-slot" key={slot.key}>
+            <div className="admin-image-preview"><img src={assetUrl(product[`image_${slot.key}`])} alt={slot.label} /></div>
             <span>{slot.label}</span>
-          </label>
+          </div>
         ))}
+        {additionalFiles.map(({ file, preview }, index) => (
+          <div className="admin-image-slot admin-image-selected" key={`${file.name}-${index}`}>
+            <div className="admin-image-preview"><img src={preview} alt={file.name} /></div>
+            <span>{file.name}</span>
+            <button type="button" className="admin-image-remove" aria-label={`Remove ${file.name}`} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
+          </div>
+        ))}
+        {additionalFiles.length < maximumAdditionalImages && (
+          <>
+            <input ref={additionalInput} className="admin-image-multiple-input" type="file" name="additional_images"
+              accept="image/png,image/jpeg,image/webp" multiple onChange={onAdditionalFilesChange} />
+            <button type="button" className="admin-image-add-button" onClick={() => additionalInput.current?.click()}>
+              <Plus size={20} />
+              <span>Add optional images</span>
+            </button>
+          </>
+        )}
       </div>
       {error && <p className="form-error">{error}</p>}
       <button className="button dark wide" disabled={submitting}>
