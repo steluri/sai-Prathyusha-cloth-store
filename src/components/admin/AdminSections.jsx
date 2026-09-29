@@ -13,7 +13,42 @@ const IMAGE_SLOTS = [
 ]
 
 const ORDER_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 let imageUploadSequence = 0
+
+async function processImage(file) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error('Choose a PNG, JPEG, or WebP image.')
+  }
+  const source = await globalThis.createImageBitmap(file, { imageOrientation: 'from-image' })
+  const canvas = document.createElement('canvas')
+  try {
+    canvas.width = source.width
+    canvas.height = source.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not process this image in your browser.')
+    while (true) {
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(source, 0, 0, canvas.width, canvas.height)
+      for (const quality of [0.85, 0.7, 0.55, 0.4, 0.25]) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality))
+        if (!blob || blob.type !== 'image/webp') throw new Error('This browser cannot create WebP images.')
+        if (blob.size <= MAX_IMAGE_BYTES) {
+          return new globalThis.File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, { type: 'image/webp' })
+        }
+      }
+      if (Math.max(canvas.width, canvas.height) <= 256) {
+        throw new Error('Could not compress this image below 2 MB.')
+      }
+      canvas.width = Math.max(1, Math.floor(canvas.width * 0.8))
+      canvas.height = Math.max(1, Math.floor(canvas.height * 0.8))
+    }
+  } finally {
+    source.close()
+    canvas.width = 0
+    canvas.height = 0
+  }
+}
 
 export function OrdersSection({ orders, loading, onStatusChange, onRefresh }) {
   if (loading) return <p className="admin-empty">Loading orders…</p>
@@ -120,10 +155,12 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
   }
 
   async function uploadImage(image, slot, updateImage) {
-    const formData = new FormData()
-    formData.append('file', image.file)
-    formData.append('slot', slot)
     try {
+      const processedFile = await processImage(image.file)
+      updateImageState(updateImage, image.id, { status: 'uploading' })
+      const formData = new FormData()
+      formData.append('file', processedFile)
+      formData.append('slot', slot)
       const response = await fetch(apiUrl('/api/admin/product-images'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -164,7 +201,7 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
     if (!file) return
     releasePreview(frontUpload?.preview)
     if (frontUpload?.path) void discardStagedImage(frontUpload.path)
-    const image = { id: ++imageUploadSequence, file, preview: createPreview(file), path: '', status: 'uploading' }
+    const image = { id: ++imageUploadSequence, file, preview: createPreview(file), path: '', status: 'processing' }
     setFrontUpload(image)
     setError('')
     void uploadImage(image, 'front', setFrontUpload)
@@ -185,7 +222,7 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
       slot: availableOptionalSlots[additionalFiles.length + index].key,
       preview: createPreview(file),
       path: '',
-      status: 'uploading',
+      status: 'processing',
     }))
     setAdditionalFiles(current => [...current, ...selectedFiles])
     selectedFiles.forEach(image => { void uploadImage(image, image.slot, setAdditionalFiles) })
@@ -193,7 +230,7 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
 
   function removeAdditionalFile(index) {
     const image = additionalFiles[index]
-    if (image?.status === 'uploading') return
+    if (image?.status === 'processing' || image?.status === 'uploading') return
     releasePreview(image?.preview)
     if (image?.path) void discardStagedImage(image.path)
     setAdditionalFiles(current => current.filter((_, fileIndex) => fileIndex !== index))
@@ -257,15 +294,15 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
       <h3 className="admin-section-title">Product images</h3>
       <div className="admin-image-grid">
         <label className="admin-image-slot">
-          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={submitting || frontUpload?.status === 'uploading'}
+          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={submitting || frontUpload?.status === 'processing' || frontUpload?.status === 'uploading'}
             onChange={onFrontFileChange} />
-          <div className={`admin-image-preview${frontUpload?.status === 'uploading' ? ' is-uploading' : ''}`}>
+          <div className={`admin-image-preview${frontUpload?.status === 'processing' || frontUpload?.status === 'uploading' ? ' is-uploading' : ''}`}>
             {frontUpload?.preview
               ? <img src={frontUpload.preview} alt="Primary product preview" />
               : product?.image_front || product?.image
                 ? <img src={assetUrl(product.image_front || product.image)} alt="Primary product" />
                 : <ImagePlus size={22} />}
-            {frontUpload?.status === 'uploading' && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />Uploading to S3</span>}
+            {(frontUpload?.status === 'processing' || frontUpload?.status === 'uploading') && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />{frontUpload.status === 'processing' ? 'Processing image' : 'Uploading to S3'}</span>}
           </div>
           <span>Primary image · Required</span>
           {frontUpload?.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
@@ -279,14 +316,14 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
         ))}
         {additionalFiles.map((image, index) => (
           <div className="admin-image-slot admin-image-selected" key={image.id}>
-            <div className={`admin-image-preview${image.status === 'uploading' ? ' is-uploading' : ''}`}>
+            <div className={`admin-image-preview${image.status === 'processing' || image.status === 'uploading' ? ' is-uploading' : ''}`}>
               <img src={image.preview} alt={image.file.name} />
-              {image.status === 'uploading' && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />Uploading to S3</span>}
+              {(image.status === 'processing' || image.status === 'uploading') && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />{image.status === 'processing' ? 'Processing image' : 'Uploading to S3'}</span>}
             </div>
             <span>{image.file.name}</span>
             {image.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
             {image.status === 'failed' && <span className="admin-image-upload-status error">{image.error}</span>}
-            <button type="button" className="admin-image-remove" aria-label={`Remove ${image.file.name}`} disabled={image.status === 'uploading' || submitting} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
+            <button type="button" className="admin-image-remove" aria-label={`Remove ${image.file.name}`} disabled={image.status === 'processing' || image.status === 'uploading' || submitting} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
           </div>
         ))}
         {additionalFiles.length < maximumAdditionalImages && (
