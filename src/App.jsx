@@ -220,7 +220,7 @@ function App() {
         {!wishlist.length ? <Empty icon={<Heart />} title="Nothing saved yet" text="Tap the heart on pieces you love." action={() => { setWishlistOpen(false); shopCategory('All') }} /> : <div className="drawer-items">{products.filter(p => wishlist.includes(p.id)).map(item => <div className="saved-item" key={item.id}><img src={assetUrl(item.image)} alt={item.name} /><div><h4>{item.name}</h4><p>{item.color}</p><strong>{money(item.price)}</strong><button onClick={() => { addToCart(item); setWishlistOpen(false); setCartOpen(true) }}>Add to bag</button></div><button className="remove" onClick={() => toggleWishlist(item)}><X size={16} /></button></div>)}</div>}
       </Drawer>
 
-      {checkoutOpen && <EmailCheckout total={cartTotal} cart={cart} onClose={() => setCheckoutOpen(false)} onComplete={order => { setCart([]); setCheckoutOpen(false); notify(`Order AV-${String(order.order_id).padStart(4, '0')} confirmed — thank you!`) }} razorpayEnabled={RAZORPAY_ENABLED} loadRazorpay={loadRazorpay} />}
+      {checkoutOpen && <EmailCheckout total={cartTotal} cart={cart} onClose={() => setCheckoutOpen(false)} onComplete={order => { setCart([]); setCheckoutOpen(false); notify(`Order AV-${String(order.order_id).padStart(4, '0')} ${order.status === 'pending_verification' ? 'submitted for payment verification' : 'confirmed — thank you!'}`) }} razorpayEnabled={RAZORPAY_ENABLED} loadRazorpay={loadRazorpay} />}
       {toast && <div className="toast"><Check size={17} />{toast}</div>}
     </div>
   )

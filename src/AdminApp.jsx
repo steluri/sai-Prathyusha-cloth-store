@@ -111,6 +111,9 @@ function AdminDashboard({ token, onLogout }) {
   }
 
   async function updateOrderStatus(order, status) {
+    if (order.status === 'pending_verification' && !window.confirm(status === 'confirmed'
+      ? `Confirm UTR ${order.upi_utr} for ${order.customer} only after checking the payment in your bank or UPI app?`
+      : `Reject payment claim for order #${order.id}?`)) return
     try {
       const response = await fetch(apiUrl(`/api/admin/orders/${order.id}`), {
         method: 'PATCH',
@@ -121,7 +124,8 @@ function AdminDashboard({ token, onLogout }) {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Could not update order')
       setOrders(current => current.map(item => item.id === order.id ? { ...item, status: data.status } : item))
-      notify(data.notification_sent ? 'Order updated and SMS sent' : 'Order updated; SMS was not sent')
+      notify(status === 'confirmed' && order.status === 'pending_verification' ? 'Payment confirmed; order ready for processing'
+        : data.notification_sent ? 'Order updated and SMS sent' : 'Order updated; SMS was not sent')
     } catch (error) {
       notify(error.message || 'Could not update order')
     }

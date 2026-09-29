@@ -203,6 +203,16 @@ footer small { grid-column:1/-1; color:#83877f; border-top:1px solid #3c413a; pa
 .otp-resend { justify-self:center; border:0; background:none; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; padding:4px; }
 .otp-resend:disabled { cursor:wait; opacity:.6; }
 .checkout-total { display:flex; justify-content:space-between; border-top:1px solid var(--line); margin-top:7px; padding-top:17px; font-size:13px; }
+.checkout-upi { border-bottom:1px solid var(--line); padding-bottom:12px; }
+.checkout-upi-toggle { display:inline-flex; align-items:center; gap:8px; padding:5px 0; border:0; background:none; color:var(--ink); font:600 12px 'Manrope',sans-serif; cursor:pointer; }
+.checkout-upi-details { display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 0 2px; text-align:center; font-size:12px; }
+.checkout-upi-details img { width:min(240px,100%); height:auto; aspect-ratio:1; background:white; }
+.checkout-upi-details span { color:var(--muted); }
+.checkout-upi-details a { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+.checkout-upi-details p { max-width:340px; margin:6px 0 0; color:var(--muted); line-height:1.5; }
+.checkout-upi-utr { width:min(300px,100%); margin-top:7px; text-align:left; }
+.checkout-upi-utr input { width:100%; box-sizing:border-box; }
+.checkout-upi-details .button { width:min(300px,100%); }
 .address-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .required-note,.optional-note { margin-left:5px; color:var(--muted); font-size:9px; font-weight:400; text-transform:uppercase; }
 .checkout-actions { display:grid; grid-template-columns:auto 1fr; gap:10px; }
@@ -336,6 +346,8 @@ footer small { grid-column:1/-1; color:#83877f; border-top:1px solid #3c413a; pa
 .order-summary span,.order-customer span,.order-items span { color:var(--muted); line-height:1.5; }
 .order-status { display:flex; flex-direction:column; gap:7px; color:var(--muted); font-size:12px; }
 .order-status select { width:100%; min-width:0; border:1px solid var(--line); background:var(--paper); padding:10px; color:var(--ink); text-transform:capitalize; }
+.order-status .button { width:100%; min-height:36px; padding:8px; font-size:11px; }
+.order-items strong { color:var(--ink); overflow-wrap:anywhere; }
 .orders-empty { display:flex; align-items:center; justify-content:center; gap:16px; color:var(--muted); padding:60px 0; }
 @media(max-width:720px) {
   .admin-header { flex-wrap:wrap; height:auto; padding:16px 4vw; gap:12px; }

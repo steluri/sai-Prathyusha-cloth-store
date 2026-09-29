@@ -69,13 +69,18 @@ export function OrdersSection({ orders, loading, onStatusChange, onRefresh }) {
             <span>{order.address || 'No address recorded'}</span>
           </div>
           <div className="order-items">
-            {(order.items || []).map((item, index) => <span key={`${item.product_id}-${index}`}>Product #{item.product_id} × {item.quantity}</span>)}
+            {(order.items || []).map((item, index) => <span key={`${item.product_id}-${index}`}>{item.name || `Product #${item.product_id}`} × {item.quantity}{item.price != null ? ` · ${money(item.price)} each` : ''}</span>)}
+            {order.upi_utr && <span>UPI UTR: <strong>{order.upi_utr}</strong></span>}
           </div>
-          <label className="order-status">Status
-            <select value={order.status} onChange={event => onStatusChange(order, event.target.value)}>
-              {ORDER_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-            </select>
-          </label>
+          {order.upi_utr && order.status === 'cancelled'
+            ? <div className="order-status"><strong>UPI claim rejected</strong></div>
+            : order.status === 'pending_verification'
+            ? <div className="order-status"><strong>Awaiting UPI verification</strong><button className="button dark" onClick={() => onStatusChange(order, 'confirmed')}>Confirm payment</button><button className="button outline" onClick={() => onStatusChange(order, 'cancelled')}>Reject claim</button></div>
+            : <label className="order-status">Status
+                <select value={order.status} onChange={event => onStatusChange(order, event.target.value)}>
+                  {ORDER_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>}
         </article>
       ))}
     </section>
