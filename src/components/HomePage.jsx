@@ -25,13 +25,16 @@ export default function HomePage({
   sort,
   loading,
   visibleProducts,
+  cart,
   wishlist,
   onCategoryChange,
   onSortChange,
   onShopCategory,
   onOpenCollection,
+  onOpenProduct,
   onToggleWishlist,
   onAddToCart,
+  onChangeCartQuantity,
   onSubscribe,
 }) {
   function submitNewsletter(event) {
@@ -39,43 +42,10 @@ export default function HomePage({
     onSubscribe()
   }
 
-  return <main id="top" className={collectionView ? 'home-view-hidden' : ''}>
-    <section className="hero">
-      <img src="/atelier-hero.png" alt="Models wearing Pandu's warm neutral collection" />
-      <div className="hero-copy">
-        <p className="eyebrow">The September edit</p>
-        <h1>Everyday,<br /><em>considered.</em></h1>
-        <p>Natural textures, thoughtful shapes, and quietly confident pieces made to live in.</p>
-        <div className="hero-buttons">
-          <button className="button dark" onClick={() => onShopCategory('Women')}>Shop women <ArrowRight size={17} /></button>
-          <button className="button text-button" onClick={() => onShopCategory('Men')}>Shop men <ArrowRight size={17} /></button>
-        </div>
-      </div>
-      <div className="hero-note"><span>01</span><p>New forms<br />in soft focus</p></div>
-    </section>
-
-    <section className="values">
-      <div><Sparkles size={22} /><p><strong>Considered design</strong><span>Fewer, better pieces for every day.</span></p></div>
-      <div><Truck size={23} /><p><strong>Complimentary delivery</strong><span>On all orders over ₹2,999.</span></p></div>
-      <div><Check size={22} /><p><strong>Easy returns</strong><span>14 days to change your mind.</span></p></div>
-    </section>
-
-    <section className="collection" id="shop">
-      <div className="section-heading">
-        <div><p className="eyebrow">Curated for now</p><h2>The new collection</h2></div>
-        <p>Clean lines meet lived-in comfort. Discover pieces that work wherever the day takes you.</p>
-      </div>
-      <div className="toolbar">
-        <div className="category-tabs">
-          {['All', 'Women', 'Men'].map(item => <button key={item} className={category === item ? 'active' : ''} onClick={() => onCategoryChange(item)}>{item}</button>)}
-        </div>
-        <label className="sort">Sort by <select value={sort} onChange={event => onSortChange(event.target.value)}><option>Featured</option><option>Newest</option><option>Price: Low to high</option><option>Price: High to low</option></select><ChevronDown size={15} /></label>
-      </div>
-      {loading ? <div className="loading-grid">{Array.from({ length: 8 }).map((_, index) => <div className="skeleton" key={index} />)}</div> :
-        visibleProducts.length ? <div className="product-grid">
-          {visibleProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} onSave={() => onToggleWishlist(product)} onAdd={() => onAddToCart(product)} />)}
-        </div> : <div className="empty-search"><Search size={28} /><h3>No pieces found</h3><p>Try a different search or category.</p></div>}
-    </section>
+  return <main id="top" className={`home-page${collectionView ? ' home-view-hidden' : ''}`}>
+    <button className="festival-poster" type="button" onClick={() => onShopCategory('All')} aria-label="Explore the Dasara festive collection">
+      <img src="/dasara-festival-poster.svg" alt="Dasara Festival: A season to dress beautifully. Explore festive styles for every gathering." />
+    </button>
 
     <CollectionTiles
       titleId="womens-collections-title"
@@ -95,6 +65,23 @@ export default function HomePage({
       collections={mensCollections}
       onOpenCollection={onOpenCollection}
     />
+
+    <section className="collection" id="shop">
+      <div className="section-heading">
+        <div><p className="eyebrow">Curated for now</p><h2>The new collection</h2></div>
+        <p>Clean lines meet lived-in comfort. Discover pieces that work wherever the day takes you.</p>
+      </div>
+      <div className="toolbar">
+        <div className="category-tabs">
+          {['All', 'Women', 'Men'].map(item => <button key={item} className={category === item ? 'active' : ''} onClick={() => onCategoryChange(item)}>{item}</button>)}
+        </div>
+        <label className="sort">Sort by <select value={sort} onChange={event => onSortChange(event.target.value)}><option>Featured</option><option>Newest</option><option>Price: Low to high</option><option>Price: High to low</option></select><ChevronDown size={15} /></label>
+      </div>
+      {loading ? <div className="loading-grid">{Array.from({ length: 8 }).map((_, index) => <div className="skeleton" key={index} />)}</div> :
+        visibleProducts.length ? <div className="product-grid">
+          {visibleProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} quantity={cart.find(item => item.id === product.id)?.quantity || 0} onOpen={() => onOpenProduct(product)} onSave={() => onToggleWishlist(product)} onAdd={() => onAddToCart(product)} onChangeQuantity={delta => onChangeCartQuantity(product.id, delta)} />)}
+        </div> : <div className="empty-search"><Search size={28} /><h3>No pieces found</h3><p>Try a different search or category.</p></div>}
+    </section>
 
     <section className="story">
       <div className="story-image"><div className="material-card"><span>01</span><strong>Natural fibres</strong><p>Breathable, tactile, enduring.</p></div></div>

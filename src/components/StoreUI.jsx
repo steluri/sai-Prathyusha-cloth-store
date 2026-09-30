@@ -23,18 +23,36 @@ export function Count({ value }) {
   return value ? <span className="count">{value}</span> : null
 }
 
-export function ProductCard({ product, saved, onSave, onAdd }) {
-  return <article className="product-card">
+export function ProductCard({ product, saved, quantity = 0, onSave, onAdd, onChangeQuantity, onOpen }) {
+  function openFromKeyboard(event) {
+    if (event.target === event.currentTarget && onOpen && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      onOpen()
+    }
+  }
+
+  return <article className={`product-card${onOpen ? ' product-card-clickable' : ''}`} onClick={onOpen} onKeyDown={openFromKeyboard} role={onOpen ? 'link' : undefined} tabIndex={onOpen ? 0 : undefined} aria-label={onOpen ? `View ${product.name}` : undefined}>
     <div className="product-image">
       <img src={assetUrl(product.image_front || product.image)} alt={product.name} loading="lazy" onError={event => retryProductImageFromS3(event, product)} />
       {product.badge && <span className="badge">{product.badge}</span>}
-      <button className={`save ${saved ? 'saved' : ''}`} onClick={onSave} aria-label="Save to wishlist">
+      <button className={`save ${saved ? 'saved' : ''}`} onClick={event => { event.stopPropagation(); onSave() }} aria-label="Save to wishlist">
         <Heart size={19} fill={saved ? 'currentColor' : 'none'} />
       </button>
-      <button className="quick-add" onClick={onAdd}>Quick add <Plus size={16} /></button>
+      {quantity > 0
+        ? <div className="quick-quantity" onClick={event => event.stopPropagation()}>
+            <button onClick={() => onChangeQuantity(-1)} aria-label={`Remove one ${product.name}`}><Minus size={16} /></button>
+            <span aria-live="polite">{quantity}</span>
+            <button onClick={() => onChangeQuantity(1)} aria-label={`Add one more ${product.name}`}><Plus size={16} /></button>
+          </div>
+        : <button className="quick-add" onClick={event => { event.stopPropagation(); onAdd() }}>Quick add <Plus size={16} /></button>}
     </div>
     <div className="product-info">
-      <div><h3>{product.name}</h3><p>{product.color}</p></div>
+      <div>
+        <h3>{product.name}</h3><p>{product.color}</p>
+        {Array.isArray(product.sizes) && product.sizes.length > 0 && <div className="product-size-list" aria-label={`Available sizes: ${product.sizes.join(', ')}`}>
+          <span>Sizes</span>{product.sizes.map(size => <span key={size}>{size}</span>)}
+        </div>}
+      </div>
       <div className="price"><strong>{money(product.price)}</strong>{product.old_price && <s>{money(product.old_price)}</s>}</div>
     </div>
   </article>
@@ -54,7 +72,7 @@ export function CartItem({ item, onChange }) {
   return <div className="cart-item">
     <img src={assetUrl(item.image)} alt={item.name} />
     <div>
-      <h4>{item.name}</h4><p>{item.color} · One size</p><strong>{money(item.price)}</strong>
+      <h4>{item.name}</h4><p>{item.color} · {Array.isArray(item.sizes) && item.sizes.length ? `Available: ${item.sizes.join(', ')}` : 'One size'}</p><strong>{money(item.price)}</strong>
       <div className="quantity">
         <button onClick={() => onChange(-1)}><Minus size={13} /></button>
         <span>{item.quantity}</span>

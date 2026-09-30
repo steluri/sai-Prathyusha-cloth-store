@@ -1,25 +1,52 @@
+import boysCollectionsImage from '../assets/collections/boys-collections.jpg'
+import girlsCollectionsImage from '../assets/collections/girls-collections.jpg'
+import mensAllProductsImage from '../assets/collections/mens-all-products.jpg'
+import mensDhotisImage from '../assets/collections/mens-dhotis.jpg'
+import mensInnersImage from '../assets/collections/mens-inners.jpg'
+import mensJeansImage from '../assets/collections/mens-jeans.jpg'
+import mensKurtasImage from '../assets/collections/mens-kurtas.jpg'
+import mensShirtsImage from '../assets/collections/mens-shirts.jpg'
+import mensTrousersImage from '../assets/collections/mens-trousers.jpg'
+import mensTshirtsImage from '../assets/collections/mens-tshirts.jpg'
+import womensAllProductsImage from '../assets/collections/womens-all-products.jpg'
+import womensChudidarsImage from '../assets/collections/womens-chudidars.jpg'
+import womensDressesLehengasImage from '../assets/collections/womens-dresses-lehengas.jpg'
+import womensInnersImage from '../assets/collections/womens-inners.jpg'
+import womensJeansImage from '../assets/collections/womens-jeans.jpg'
+import womensKurtisImage from '../assets/collections/womens-kurtis.jpg'
+import womensLehengasImage from '../assets/collections/womens-lehengas.webp'
+import womensSareesImage from '../assets/collections/womens-sarees.png'
+import womensTopsImage from '../assets/collections/womens-tops.jpg'
+
 export const mensCollections = [
-  { name: 'Shirts', image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Jeans', image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Trousers', image: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?auto=format&fit=crop&w=900&q=85' },
-  { name: 'T-shirts', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Kurtas', image: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Dhotis', image: 'https://images.unsplash.com/photo-1603252109303-2751441dd157?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Inners', image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Boys Collections', image: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&w=900&q=85' },
-  { name: 'All Products', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Shirts', image: mensShirtsImage },
+  { name: 'Jeans', image: mensJeansImage },
+  { name: 'Trousers', image: mensTrousersImage },
+  { name: 'T-shirts', image: mensTshirtsImage },
+  { name: 'Kurtas', image: mensKurtasImage },
+  { name: 'Dhotis', image: mensDhotisImage },
+  { name: 'Inners', image: mensInnersImage },
+  { name: 'Boys Collections', image: boysCollectionsImage },
+  { name: 'All Products', image: mensAllProductsImage },
 ]
 
 export const womensCollections = [
-  { name: 'Sarees', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Kurtis', image: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Dresses', image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Tops', image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Jeans', image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Chudidars', image: 'https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Inners', image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop&w=900&q=85' },
-  { name: 'Girls Collections', image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=85' },
-  { name: 'All Products', image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85' },
+  { name: 'Sarees', image: womensSareesImage },
+  { name: 'Lehengas', image: womensLehengasImage },
+  { name: 'Kurtis', image: womensKurtisImage },
+  { name: 'Dresses', image: womensDressesLehengasImage },
+  { name: 'Tops', image: womensTopsImage },
+  { name: 'Jeans', image: womensJeansImage },
+  { name: 'Chudidars', image: womensChudidarsImage },
+  { name: 'Inners', image: womensInnersImage },
+  { name: 'Girls Collections', image: girlsCollectionsImage },
+  { name: 'All Products', image: womensAllProductsImage },
+]
+
+export const kidsCollections = [
+  { name: 'All Kids', image: boysCollectionsImage },
+  { name: 'Boys Collections', image: boysCollectionsImage },
+  { name: 'Girls Collections', image: girlsCollectionsImage },
 ]
 
 const collectionMatchers = {
@@ -35,6 +62,7 @@ const collectionMatchers = {
   },
   Women: {
     Sarees: /saree/i,
+    Lehengas: /lehenga|ghagra|chaniya/i,
     Kurtis: /kurti|kurta|co-ord/i,
     Dresses: /dress/i,
     Tops: /top|shirt|blouse/i,
@@ -46,7 +74,16 @@ const collectionMatchers = {
 }
 
 export function matchesCollection(product, audience, type) {
+  if (audience === 'Kids') {
+    const productText = `${product.name} ${product.description || ''}`
+    const boysItem = product.category === 'Boy-Kid' || (product.category === 'Men' && /boy|junior|kid|child/i.test(productText))
+    const girlsItem = product.category === 'Girl-Kid' || (product.category === 'Women' && /girl|junior|kid|child/i.test(productText))
+    if (type === 'Boys Collections') return boysItem
+    if (type === 'Girls Collections') return girlsItem
+    return type === 'All Kids' && (boysItem || girlsItem)
+  }
   if (product.category !== audience) return false
   if (type === 'All Products') return true
+  if (product.item_type) return product.item_type === type
   return collectionMatchers[audience]?.[type]?.test(`${product.name} ${product.description || ''}`) || false
 }

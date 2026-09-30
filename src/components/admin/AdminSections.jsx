@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { ImagePlus, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { apiUrl, assetUrl } from '../../api'
+import { mensCollections, womensCollections } from '../../data/collections'
 import { money } from '../../utils/format'
 
 const IMAGE_SLOTS = [
-  { key: 'front', label: 'Front' },
+  { key: 'front', label: 'Poster' },
   { key: 'back', label: 'Back' },
   { key: 'side', label: 'Side' },
   { key: 'closeup', label: 'Close-up' },
@@ -13,6 +14,19 @@ const IMAGE_SLOTS = [
 ]
 
 const ORDER_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+const itemTypesFor = collections => collections
+  .filter(({ name }) => !['All Products', 'Boys Collections', 'Girls Collections'].includes(name))
+  .map(({ name }) => name)
+const ITEM_TYPES_BY_CATEGORY = {
+  Men: itemTypesFor(mensCollections),
+  Women: itemTypesFor(womensCollections),
+  'Boy-Kid': itemTypesFor(mensCollections),
+  'Girl-Kid': itemTypesFor(womensCollections),
+}
+const ADULT_SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size']
+const KID_SIZE_OPTIONS = ['1-2Y', '2-3Y', '3-4Y', '4-5Y', '5-6Y', '6-7Y', '7-8Y', '8-9Y', '9-10Y', '10-11Y', '11-12Y', '12-13Y', '13-14Y']
+const INCH_SIZE_OPTIONS = Array.from({ length: 21 }, (_, index) => `${index + 20} in`)
+const LOWER_BODY_TYPES = new Set(['Jeans', 'Trousers', 'Dhotis', 'Chudidars'])
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 let imageUploadSequence = 0
 
@@ -97,7 +111,7 @@ export function ProductsSection({ products, loading, onEdit, onDelete }) {
           <img src={assetUrl(product.image_front || product.image)} alt={product.name} />
           <div>
             <h3>{product.name}</h3>
-            <p>{product.category} · {product.color}</p>
+            <p>{product.category}{product.item_type ? ` · ${product.item_type}` : ''} · {product.color}</p>
             <strong>{money(product.price)}</strong>
             <div className="admin-card-actions">
               <button className="button outline" onClick={() => onEdit(product)}><Pencil size={14} /> Edit</button>
@@ -112,6 +126,9 @@ export function ProductsSection({ products, loading, onEdit, onDelete }) {
 
 export function ProductForm({ token, product, onSaved, onUnauthorized, notify }) {
   const isEditing = Boolean(product)
+  const [category, setCategory] = useState(product?.category ?? 'Women')
+  const [itemType, setItemType] = useState(product?.item_type ?? '')
+  const [sizes, setSizes] = useState(() => Array.isArray(product?.sizes) ? product.sizes : [])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [frontUpload, setFrontUpload] = useState(null)
@@ -120,6 +137,9 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
   const objectUrls = useRef(new Set())
   const stagedImagePaths = useRef(new Set())
   const optionalSlots = IMAGE_SLOTS.slice(1)
+  const itemTypeOptions = ITEM_TYPES_BY_CATEGORY[category] ?? []
+  const isKidsCategory = category === 'Boy-Kid' || category === 'Girl-Kid'
+  const sizeOptions = isKidsCategory ? KID_SIZE_OPTIONS : LOWER_BODY_TYPES.has(itemType) ? INCH_SIZE_OPTIONS : ADULT_SIZE_OPTIONS
   const availableOptionalSlots = optionalSlots.filter(slot => !product?.[`image_${slot.key}`])
   const maximumAdditionalImages = availableOptionalSlots.length
   const primaryImageReady = frontUpload
@@ -187,16 +207,24 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
   }
 
   async function discardStagedImage(path) {
-    if (!path) return
-    stagedImagePaths.current.delete(path)
+    if (!path) return true
     try {
-      await fetch(apiUrl('/api/admin/product-images'), {
+      const response = await fetch(apiUrl('/api/admin/product-images'), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path }),
       })
-    } catch {
-      notify('Could not remove the staged image from storage.')
+      if (response.status === 401) {
+        onUnauthorized()
+        return false
+      }
+      const data = response.ok ? {} : await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Could not remove the image from storage.')
+      stagedImagePaths.current.delete(path)
+      return true
+    } catch (deleteError) {
+      notify(deleteError.message || 'Could not remove the image from storage.')
+      return false
     }
   }
 
@@ -233,16 +261,27 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
     selectedFiles.forEach(image => { void uploadImage(image, image.slot, setAdditionalFiles) })
   }
 
-  function removeAdditionalFile(index) {
+  async function removeFrontFile() {
+    if (!frontUpload || frontUpload.status === 'processing' || frontUpload.status === 'uploading' || submitting) return
+    if (!await discardStagedImage(frontUpload.path)) return
+    releasePreview(frontUpload.preview)
+    setFrontUpload(null)
+  }
+
+  async function removeAdditionalFile(index) {
     const image = additionalFiles[index]
-    if (image?.status === 'processing' || image?.status === 'uploading') return
+    if (!image || image.status === 'processing' || image.status === 'uploading' || submitting) return
+    if (!await discardStagedImage(image.path)) return
     releasePreview(image?.preview)
-    if (image?.path) void discardStagedImage(image.path)
     setAdditionalFiles(current => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
   async function submit(event) {
     event.preventDefault()
+    if (!sizes.length) {
+      setError('Choose at least one available size.')
+      return
+    }
     if (!uploadsReady) {
       setError('Wait for all selected images to finish uploading before saving.')
       return
@@ -288,31 +327,49 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
   return (
     <form className="admin-add-form" onSubmit={submit}>
       <div className="admin-form-grid">
-        <label>Name<input name="name" required defaultValue={product?.name} placeholder="Linen Ease Shirt" /></label>
-        <label>Category<select name="category" required defaultValue={product?.category ?? 'Women'}><option>Women</option><option>Men</option></select></label>
+        <label>Item name<input name="name" required defaultValue={product?.name} placeholder="Linen Ease Shirt" /></label>
+        <label>Category<select name="category" required value={category} onChange={event => { setCategory(event.target.value); setItemType(''); setSizes([]); setError('') }}>
+          <option value="Women">Women</option><option value="Men">Men</option><option value="Boy-Kid">Boy-Kid</option><option value="Girl-Kid">Girl-Kid</option>
+        </select></label>
+        <label>Item type<select name="item_type" required value={itemType} onChange={event => { setItemType(event.target.value); setSizes([]); setError('') }}>
+          <option value="">Choose item type</option>
+          {itemTypeOptions.map(type => <option key={type} value={type}>{type}</option>)}
+        </select></label>
         <label>Color<input name="color" required defaultValue={product?.color} placeholder="Oat" /></label>
         <label>Price (₹)<input name="price" type="number" min="1" required defaultValue={product?.price} placeholder="2499" /></label>
-        <label>Old price (₹, optional)<input name="old_price" type="number" min="1" defaultValue={product?.old_price ?? ''} placeholder="2999" /></label>
-        <label>Badge (optional)<input name="badge" defaultValue={product?.badge ?? ''} placeholder="New / Bestseller / Limited" /></label>
       </div>
-      <label className="admin-textarea">Description<textarea name="description" required defaultValue={product?.description} placeholder="A breezy linen-blend shirt with an easy, oversized silhouette." /></label>
-      <h3 className="admin-section-title">Product images</h3>
+      <fieldset className="admin-size-fieldset">
+        <legend>Available sizes</legend>
+        <div className="admin-size-options">
+          {sizeOptions.map(size => (
+            <label className="admin-size-option" key={size}>
+              <input type="checkbox" name="sizes" value={size} checked={sizes.includes(size)} onChange={() => setSizes(current => current.includes(size) ? current.filter(value => value !== size) : [...current, size])} />
+              <span>{size}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <h3 className="admin-section-title">Poster image</h3>
       <div className="admin-image-grid">
-        <label className="admin-image-slot">
-          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={submitting || frontUpload?.status === 'processing' || frontUpload?.status === 'uploading'}
-            onChange={onFrontFileChange} />
-          <div className={`admin-image-preview${frontUpload?.status === 'processing' || frontUpload?.status === 'uploading' ? ' is-uploading' : ''}`}>
-            {frontUpload?.preview
-              ? <img src={frontUpload.preview} alt="Primary product preview" />
-              : product?.image_front || product?.image
-                ? <img src={assetUrl(product.image_front || product.image)} alt="Primary product" />
-                : <ImagePlus size={22} />}
-            {(frontUpload?.status === 'processing' || frontUpload?.status === 'uploading') && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />{frontUpload.status === 'processing' ? 'Processing image' : 'Uploading to S3'}</span>}
-          </div>
-          <span>Primary image · Required</span>
-          {frontUpload?.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
-          {frontUpload?.status === 'failed' && <span className="admin-image-upload-status error">{frontUpload.error}</span>}
-        </label>
+        <div className="admin-image-slot admin-image-selected admin-image-primary">
+          <label className="admin-image-upload-label">
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={submitting || frontUpload?.status === 'processing' || frontUpload?.status === 'uploading'}
+              onChange={onFrontFileChange} aria-required="true" />
+            <div className={`admin-image-preview${frontUpload?.status === 'processing' || frontUpload?.status === 'uploading' ? ' is-uploading' : ''}`}>
+              {frontUpload?.preview
+                ? <img src={frontUpload.preview} alt="Poster preview" />
+                : product?.image_front || product?.image
+                  ? <img src={assetUrl(product.image_front || product.image)} alt="Product poster" />
+                  : <ImagePlus size={22} />}
+              {(frontUpload?.status === 'processing' || frontUpload?.status === 'uploading') && <span className="admin-image-upload-overlay"><LoaderCircle className="admin-image-upload-spinner" size={22} />{frontUpload.status === 'processing' ? 'Processing image' : 'Uploading to S3'}</span>}
+            </div>
+            <span>Poster image · Required</span>
+            {frontUpload?.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
+            {frontUpload?.status === 'failed' && <span className="admin-image-upload-status error">{frontUpload.error}</span>}
+          </label>
+          {frontUpload && <button type="button" className="admin-image-remove" aria-label="Remove poster image" title="Remove poster image"
+            disabled={frontUpload.status === 'processing' || frontUpload.status === 'uploading' || submitting} onClick={removeFrontFile}><X size={15} /></button>}
+        </div>
         {optionalSlots.map(slot => product?.[`image_${slot.key}`] && (
           <div className="admin-image-slot" key={slot.key}>
             <div className="admin-image-preview"><img src={assetUrl(product[`image_${slot.key}`])} alt={slot.label} /></div>
@@ -328,7 +385,7 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
             <span>{image.file.name}</span>
             {image.status === 'uploaded' && <span className="admin-image-upload-status">Uploaded to S3</span>}
             {image.status === 'failed' && <span className="admin-image-upload-status error">{image.error}</span>}
-            <button type="button" className="admin-image-remove" aria-label={`Remove ${image.file.name}`} disabled={image.status === 'processing' || image.status === 'uploading' || submitting} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
+            <button type="button" className="admin-image-remove" aria-label={`Remove ${image.file.name}`} title={`Remove ${image.file.name}`} disabled={image.status === 'processing' || image.status === 'uploading' || submitting} onClick={() => removeAdditionalFile(index)}><X size={15} /></button>
           </div>
         ))}
         {additionalFiles.length < maximumAdditionalImages && (
@@ -342,6 +399,7 @@ export function ProductForm({ token, product, onSaved, onUnauthorized, notify })
           </>
         )}
       </div>
+      <label className="admin-textarea">Description<textarea name="description" required defaultValue={product?.description} placeholder="Describe the material, fit, and details." /></label>
       {error && <p className="form-error">{error}</p>}
       <button className="button dark wide" disabled={submitting || !uploadsReady}>
         {submitting ? 'Saving product…' : isEditing ? 'Save changes' : 'Add product'}

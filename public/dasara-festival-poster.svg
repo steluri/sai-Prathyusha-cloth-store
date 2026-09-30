@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="600" viewBox="0 0 1440 600" fill="none">
+  <defs>
+    <linearGradient id="photoShade" x1="0" y1="0" x2="790" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#241E17" stop-opacity=".03"/>
+      <stop offset="1" stop-color="#241E17" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="800" y1="0" x2="1440" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6EBD7"/>
+      <stop offset="1" stop-color="#EAD5B3"/>
+    </linearGradient>
+    <pattern id="grain" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r=".7" fill="#713F27" fill-opacity=".13"/>
+    </pattern>
+    <clipPath id="photoClip"><rect width="770" height="600"/></clipPath>
+  </defs>
+  <g clip-path="url(#photoClip)">
+    <image href="/atelier-hero.png" width="770" height="600" preserveAspectRatio="xMidYMid slice"/>
+    <rect width="770" height="600" fill="url(#photoShade)"/>
+    <path d="M37 37h696v526H37z" stroke="#F3E6CC" stroke-opacity=".8" stroke-width="1.5"/>
+    <path d="M51 51h668v498H51z" stroke="#F3E6CC" stroke-opacity=".5"/>
+    <text x="75" y="518" fill="#FFF9ED" font-family="Georgia,serif" font-size="20" letter-spacing="5">PANDU  /  FESTIVE EDITION</text>
+  </g>
+  <path d="M770 0h670v600H770z" fill="url(#paper)"/>
+  <path d="M770 0h670v600H770z" fill="url(#grain)"/>
+  <path d="M802 32h606v536H802z" stroke="#A85232" stroke-opacity=".6"/>
+  <path d="M814 44h582v512H814z" stroke="#A85232" stroke-opacity=".25"/>
+  <g fill="#A85232" opacity=".75">
+    <path d="M1105 69c-12 14-12 27 0 39 12-12 12-25 0-39Z"/>
+    <path d="M1080 91c14-12 27-12 39 0-12 12-25 12-39 0Z"/>
+    <path d="M1105 113c-12-14-12-27 0-39 12 12 12 25 0 39Z"/>
+    <path d="M1130 91c-14 12-27 12-39 0 12-12 25-12 39 0Z"/>
+    <circle cx="1105" cy="91" r="4" fill="#C18B43"/>
+  </g>
+  <text x="1105" y="179" text-anchor="middle" fill="#70452F" font-family="Arial,sans-serif" font-size="13" font-weight="600" letter-spacing="5">A SEASON OF CELEBRATION</text>
+  <text x="1105" y="261" text-anchor="middle" fill="#252720" font-family="Georgia,serif" font-size="65">Dasara</text>
+  <text x="1105" y="322" text-anchor="middle" fill="#A85232" font-family="Georgia,serif" font-size="47" font-style="italic">Festival</text>
+  <path d="M1019 350h172" stroke="#A85232" stroke-opacity=".55"/>
+  <circle cx="1105" cy="350" r="3" fill="#A85232"/>
+  <text x="1105" y="396" text-anchor="middle" fill="#45463D" font-family="Arial,sans-serif" font-size="17" letter-spacing=".5">A season to dress beautifully.</text>
+  <text x="1105" y="425" text-anchor="middle" fill="#6F716B" font-family="Arial,sans-serif" font-size="14" letter-spacing=".3">Festive styles for every gathering</text>
+  <path d="M1001 466h208v52h-208z" fill="#252720"/>
+  <text x="1105" y="498" text-anchor="middle" fill="#FFF9ED" font-family="Arial,sans-serif" font-size="12" font-weight="600" letter-spacing="2">EXPLORE THE COLLECTION</text>
+</svg>

@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    strictPort: true,
     allowedHosts: ['murali07.online'],
     proxy: {
       '/api': 'http://localhost:5001',

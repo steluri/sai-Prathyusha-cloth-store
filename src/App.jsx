@@ -6,11 +6,16 @@ import { apiUrl, assetUrl } from './api'
 import CollectionPage from './components/CollectionPage'
 import EmailCheckout from './components/EmailCheckout'
 import HomePage from './components/HomePage'
+import ProductDetailPage from './components/ProductDetailPage'
 import { CartItem, Count, Drawer, Empty } from './components/StoreUI'
-import { matchesCollection, mensCollections, womensCollections } from './data/collections'
+import { kidsCollections, matchesCollection, mensCollections, womensCollections } from './data/collections'
 import { money } from './utils/format'
 
 const RAZORPAY_ENABLED = import.meta.env.VITE_ENABLE_RAZORPAY === 'true'
+const LETTER_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size']
+const AGE_SIZES = ['1-2Y', '2-3Y', '3-4Y', '4-5Y', '5-6Y', '6-7Y', '7-8Y', '8-9Y', '9-10Y', '10-11Y', '11-12Y', '12-13Y', '13-14Y']
+const INCH_SIZES = Array.from({ length: 21 }, (_, index) => `${index + 20} in`)
+const LOWER_BODY_TYPES = new Set(['Jeans', 'Trousers', 'Dhotis', 'Chudidars'])
 
 let razorpayLoader
 function loadRazorpay() {
@@ -42,9 +47,11 @@ function App() {
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
   const [collectionView, setCollectionView] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
   const [minimumPrice, setMinimumPrice] = useState('')
   const [maximumPrice, setMaximumPrice] = useState('')
   const [selectedColor, setSelectedColor] = useState('')
+  const [selectedSize, setSelectedSize] = useState('')
   const [saleOnly, setSaleOnly] = useState(false)
 
   useEffect(() => {
@@ -81,14 +88,32 @@ function App() {
       (!minimumPrice || Number(product.price) >= Number(minimumPrice)) &&
       (!maximumPrice || Number(product.price) <= Number(maximumPrice)) &&
       (!selectedColor || product.color === selectedColor) &&
+      (!selectedSize || product.sizes?.includes(selectedSize)) &&
       (!saleOnly || product.old_price))
     if (sort === 'Price: Low to high') list = [...list].sort((a, b) => a.price - b.price)
     if (sort === 'Price: High to low') list = [...list].sort((a, b) => b.price - a.price)
     if (sort === 'Newest') list = [...list].sort((a, b) => b.id - a.id)
     return list
-  }, [collectionBaseProducts, minimumPrice, maximumPrice, selectedColor, saleOnly, sort])
+  }, [collectionBaseProducts, minimumPrice, maximumPrice, selectedColor, selectedSize, saleOnly, sort])
 
   const collectionColors = useMemo(() => [...new Set(collectionBaseProducts.map(product => product.color))], [collectionBaseProducts])
+  const collectionSizeGroups = useMemo(() => {
+    if (!collectionView) return []
+    const availableSizes = new Set(collectionBaseProducts.flatMap(product => Array.isArray(product.sizes) ? product.sizes : []))
+    const groups = collectionView.audience === 'Kids'
+      ? [{ label: 'Age', sizes: AGE_SIZES }]
+      : LOWER_BODY_TYPES.has(collectionView.type)
+        ? [{ label: 'Waist (inches)', sizes: INCH_SIZES }]
+        : collectionView.type === 'All Products'
+          ? [{ label: 'Letters', sizes: LETTER_SIZES }, { label: 'Waist (inches)', sizes: INCH_SIZES }]
+          : [{ label: 'Letters', sizes: LETTER_SIZES }]
+    return groups
+      .map(group => ({ ...group, sizes: group.sizes.filter(size => availableSizes.has(size)) }))
+      .filter(group => group.sizes.length)
+  }, [collectionBaseProducts, collectionView])
+  const relatedProducts = useMemo(() => selectedProduct
+    ? products.filter(product => product.id !== selectedProduct.id && product.category === selectedProduct.category).slice(0, 8)
+    : [], [products, selectedProduct])
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -123,6 +148,7 @@ function App() {
   }
 
   function shopCategory(next) {
+    setSelectedProduct(null)
     setCollectionView(null)
     setCategory(next)
     window.requestAnimationFrame(() => document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' }))
@@ -130,35 +156,50 @@ function App() {
   }
 
   function openCollection(audience, type) {
+    setSelectedProduct(null)
     if (collectionView?.audience !== audience) {
       setSelectedColor('')
       setSaleOnly(false)
     }
+    if (collectionView?.audience !== audience || collectionView?.type !== type) setSelectedSize('')
     setCollectionView({ audience, type })
     setMobileOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function openProduct(product) {
+    setSelectedProduct(product)
+    setMobileOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function showHome() {
+    setSelectedProduct(null)
+    setCollectionView(null)
   }
 
   function clearCatalogFilters() {
     setMinimumPrice('')
     setMaximumPrice('')
     setSelectedColor('')
+    setSelectedSize('')
     setSaleOnly(false)
   }
 
-  const collectionTabs = collectionView?.audience === 'Women' ? womensCollections : mensCollections
+  const collectionTabs = collectionView?.audience === 'Kids'
+    ? kidsCollections
+    : collectionView?.audience === 'Women' ? womensCollections : mensCollections
 
   return (
     <div className="site-shell">
       <div className="announcement">Free shipping on orders over ₹2,999 <span>•</span> Easy 14-day returns</div>
       <header className="header">
         <button className="icon-btn mobile-menu" aria-label="Menu" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={21} /></button>
-        <a className="logo" href="#top" onClick={() => setCollectionView(null)}>Pandu<span>.</span></a>
+        <a className="logo" href="#top" onClick={showHome}>Pandu<span>.</span></a>
         <nav className={mobileOpen ? 'nav open' : 'nav'}>
           <button onClick={() => shopCategory('Women')}>Women</button>
           <button onClick={() => shopCategory('Men')}>Men</button>
-          <button onClick={() => shopCategory('All')}>New arrivals</button>
-          <button onClick={() => shopCategory('All')}>The edit</button>
+          <button onClick={() => openCollection('Kids', 'All Kids')}>Kids</button>
         </nav>
         <div className="header-actions">
           <label className="header-search"><Search size={18} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" /></label>
@@ -167,47 +208,70 @@ function App() {
         </div>
       </header>
 
-      {collectionView && <CollectionPage
+      {selectedProduct && <ProductDetailPage
+        key={selectedProduct.id}
+        product={selectedProduct}
+        inCart={cart.some(item => item.id === selectedProduct.id)}
+        cart={cart}
+        relatedProducts={relatedProducts}
+        wishlist={wishlist}
+        onBack={() => setSelectedProduct(null)}
+        onOpenCart={() => setCartOpen(true)}
+        onOpenProduct={openProduct}
+        onToggleWishlist={toggleWishlist}
+        onAddToCart={addToCart}
+        onChangeCartQuantity={changeQuantity}
+      />}
+
+      {!selectedProduct && collectionView && <CollectionPage
         collectionView={collectionView}
         collectionTabs={collectionTabs}
         collectionColors={collectionColors}
+        collectionSizeGroups={collectionSizeGroups}
         collectionProducts={collectionProducts}
+        cart={cart}
         wishlist={wishlist}
         loading={loading}
         sort={sort}
         minimumPrice={minimumPrice}
         maximumPrice={maximumPrice}
         selectedColor={selectedColor}
+        selectedSize={selectedSize}
         saleOnly={saleOnly}
-        onBack={() => { setCollectionView(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
         onClearFilters={clearCatalogFilters}
         onMinimumPriceChange={setMinimumPrice}
         onMaximumPriceChange={setMaximumPrice}
         onColorSelect={setSelectedColor}
+        onSizeSelect={setSelectedSize}
         onSaleOnlyChange={setSaleOnly}
         onSortChange={setSort}
         onOpenCollection={openCollection}
+        onOpenProduct={openProduct}
         onToggleWishlist={toggleWishlist}
         onAddToCart={addToCart}
+        onChangeCartQuantity={changeQuantity}
       />}
 
-      <HomePage
+      {!selectedProduct && <HomePage
         collectionView={collectionView}
         category={category}
         sort={sort}
         loading={loading}
         visibleProducts={visibleProducts}
+        cart={cart}
         wishlist={wishlist}
         onCategoryChange={setCategory}
         onSortChange={setSort}
         onShopCategory={shopCategory}
         onOpenCollection={openCollection}
+        onOpenProduct={openProduct}
         onToggleWishlist={toggleWishlist}
         onAddToCart={addToCart}
+        onChangeCartQuantity={changeQuantity}
         onSubscribe={() => notify('Welcome to the Pandu community')}
-      />
+      />}
 
-      <footer><a className="logo" href="#top" onClick={() => setCollectionView(null)}>Pandu<span>.</span></a><p>Clothes for living, thoughtfully made.</p><div><a href="#shop" onClick={() => setCollectionView(null)}>Shop</a><a href="#top" onClick={() => setCollectionView(null)}>About</a><a href="mailto:hello@Pandu.store">Contact</a></div><small>© 2026 Pandu Studio</small></footer>
+      <footer><a className="logo" href="#top" onClick={showHome}>Pandu<span>.</span></a><p>Clothes for living, thoughtfully made.</p><div><a href="#shop" onClick={showHome}>Shop</a><a href="#top" onClick={showHome}>About</a><a href="mailto:hello@Pandu.store">Contact</a></div><small>© 2026 Pandu Studio</small></footer>
 
       <Drawer open={cartOpen} onClose={() => setCartOpen(false)} title="Your bag" count={cartCount}>
         {!cart.length ? <Empty icon={<ShoppingBag />} title="Your bag is empty" text="Good things are waiting." action={() => { setCartOpen(false); shopCategory('All') }} /> : <>
