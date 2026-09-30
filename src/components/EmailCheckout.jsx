@@ -6,10 +6,10 @@ import { money } from '../utils/format'
 
 const MERCHANT_UPI_ID = 'telurisrikanth@ybl'
 
-export default function EmailCheckout({ total, cart, onClose, onComplete, razorpayEnabled, loadRazorpay }) {
+export default function EmailCheckout({ total, cart, user, token, onClose, onComplete, razorpayEnabled, loadRazorpay }) {
   const [step, setStep] = useState('contact')
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [name, setName] = useState(user?.name || '')
+  const [email, setEmail] = useState(user?.email || '')
   const [address, setAddress] = useState({ door: '', line1: '', line2: '', city: '', pincode: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -33,7 +33,7 @@ export default function EmailCheckout({ total, cart, onClose, onComplete, razorp
   async function request(path, body) {
     const response = await fetch(apiUrl(path), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
       body: JSON.stringify(body),
     })
     const data = await response.json()

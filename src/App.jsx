@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft, ArrowRight, Check, Heart, Menu, Search, ShoppingBag, X,
+  ArrowLeft, ArrowRight, Check, Heart, Menu, Search, ShoppingBag, UserRound, X,
 } from 'lucide-react'
 import { apiUrl, assetUrl } from './api'
+import AccountPage from './components/AccountPage'
 import CollectionPage from './components/CollectionPage'
 import EmailCheckout from './components/EmailCheckout'
 import HomePage from './components/HomePage'
@@ -34,6 +35,8 @@ function loadRazorpay() {
 }
 
 function App() {
+  const [account, setAccount] = useState(() => JSON.parse(localStorage.getItem('Pandu-account') || 'null'))
+  const [accountOpen, setAccountOpen] = useState(false)
   const [products, setProducts] = useState([])
   const [wishlist, setWishlist] = useState([])
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('Pandu-cart') || '[]'))
@@ -60,6 +63,14 @@ function App() {
       .catch(() => setToast('Start the Python API to load the collection.'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!account?.token) return
+    fetch(apiUrl('/api/auth/me'), { headers: { Authorization: `Bearer ${account.token}` } })
+      .then(response => { if (!response.ok) throw new Error(); return response.json() })
+      .then(data => setAccount(current => ({ ...current, user: data.user })))
+      .catch(() => { localStorage.removeItem('Pandu-account'); setAccount(null) })
+  }, [account?.token])
 
   useEffect(() => localStorage.setItem('Pandu-cart', JSON.stringify(cart)), [cart])
   useEffect(() => {
@@ -174,8 +185,20 @@ function App() {
   }
 
   function showHome() {
+    setAccountOpen(false)
     setSelectedProduct(null)
     setCollectionView(null)
+  }
+
+  function authenticate(nextAccount) {
+    localStorage.setItem('Pandu-account', JSON.stringify(nextAccount))
+    setAccount(nextAccount)
+  }
+
+  function logout() {
+    localStorage.removeItem('Pandu-account')
+    setAccount(null)
+    notify('You have been logged out')
   }
 
   function clearCatalogFilters() {
@@ -203,12 +226,15 @@ function App() {
         </nav>
         <div className="header-actions">
           <label className="header-search"><Search size={18} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" /></label>
+          <button className="icon-btn" aria-label={account ? 'Profile' : 'Log in'} onClick={() => { setAccountOpen(true); setSelectedProduct(null); setCollectionView(null); setMobileOpen(false); window.scrollTo(0, 0) }}><UserRound size={20} /></button>
           <button className="icon-btn" aria-label="Wishlist" onClick={() => setWishlistOpen(true)}><Heart size={20} /><Count value={wishlist.length} /></button>
           <button className="icon-btn" aria-label="Shopping bag" onClick={() => setCartOpen(true)}><ShoppingBag size={20} /><Count value={cartCount} /></button>
         </div>
       </header>
 
-      {selectedProduct && <ProductDetailPage
+      {accountOpen && <AccountPage user={account?.user} token={account?.token} onAuthenticate={authenticate} onLogout={logout} onBack={showHome} />}
+
+      {!accountOpen && selectedProduct && <ProductDetailPage
         key={selectedProduct.id}
         product={selectedProduct}
         inCart={cart.some(item => item.id === selectedProduct.id)}
@@ -223,7 +249,7 @@ function App() {
         onChangeCartQuantity={changeQuantity}
       />}
 
-      {!selectedProduct && collectionView && <CollectionPage
+      {!accountOpen && !selectedProduct && collectionView && <CollectionPage
         collectionView={collectionView}
         collectionTabs={collectionTabs}
         collectionColors={collectionColors}
@@ -252,7 +278,7 @@ function App() {
         onChangeCartQuantity={changeQuantity}
       />}
 
-      {!selectedProduct && <HomePage
+      {!accountOpen && !selectedProduct && <HomePage
         collectionView={collectionView}
         category={category}
         sort={sort}
@@ -284,7 +310,7 @@ function App() {
         {!wishlist.length ? <Empty icon={<Heart />} title="Nothing saved yet" text="Tap the heart on pieces you love." action={() => { setWishlistOpen(false); shopCategory('All') }} /> : <div className="drawer-items">{products.filter(p => wishlist.includes(p.id)).map(item => <div className="saved-item" key={item.id}><img src={assetUrl(item.image)} alt={item.name} /><div><h4>{item.name}</h4><p>{item.color}</p><strong>{money(item.price)}</strong><button onClick={() => { addToCart(item); setWishlistOpen(false); setCartOpen(true) }}>Add to bag</button></div><button className="remove" onClick={() => toggleWishlist(item)}><X size={16} /></button></div>)}</div>}
       </Drawer>
 
-      {checkoutOpen && <EmailCheckout total={cartTotal} cart={cart} onClose={() => setCheckoutOpen(false)} onComplete={order => { setCart([]); setCheckoutOpen(false); notify(`Order AV-${String(order.order_id).padStart(4, '0')} ${order.status === 'pending_verification' ? 'submitted for payment verification' : 'confirmed — thank you!'}`) }} razorpayEnabled={RAZORPAY_ENABLED} loadRazorpay={loadRazorpay} />}
+      {checkoutOpen && <EmailCheckout total={cartTotal} cart={cart} user={account?.user} token={account?.token} onClose={() => setCheckoutOpen(false)} onComplete={order => { setCart([]); setCheckoutOpen(false); notify(`Order AV-${String(order.order_id).padStart(4, '0')} ${order.status === 'pending_verification' ? 'submitted for payment verification' : 'confirmed — thank you!'}`) }} razorpayEnabled={RAZORPAY_ENABLED} loadRazorpay={loadRazorpay} />}
       {toast && <div className="toast"><Check size={17} />{toast}</div>}
     </div>
   )
