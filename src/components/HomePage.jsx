@@ -1,4 +1,5 @@
-import { ArrowRight, Check, ChevronDown, Search, Sparkles, Truck } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, ChevronDown, Search } from 'lucide-react'
 import { mensCollections, womensCollections } from '../data/collections'
 import { ProductCard } from './StoreUI'
 
@@ -23,8 +24,8 @@ export default function HomePage({
   collectionView,
   category,
   sort,
-  loading,
-  visibleProducts,
+  bestSellerLoading,
+  bestSellerProducts,
   cart,
   wishlist,
   onCategoryChange,
@@ -37,6 +38,19 @@ export default function HomePage({
   onChangeCartQuantity,
   onSubscribe,
 }) {
+  const bestSellersTrack = useRef(null)
+  const [scrollDuration, setScrollDuration] = useState(45)
+
+  useEffect(() => {
+    const group = bestSellersTrack.current?.querySelector('.best-sellers-track-group')
+    if (!group) return
+    const updateDuration = () => setScrollDuration(group.scrollWidth / 45)
+    const observer = new globalThis.ResizeObserver(updateDuration)
+    observer.observe(group)
+    updateDuration()
+    return () => observer.disconnect()
+  }, [bestSellerProducts.length])
+
   function submitNewsletter(event) {
     event.preventDefault()
     onSubscribe()
@@ -68,8 +82,8 @@ export default function HomePage({
 
     <section className="collection" id="shop">
       <div className="section-heading">
-        <div><p className="eyebrow">Curated for now</p><h2>The new collection</h2></div>
-        <p>Clean lines meet lived-in comfort. Discover pieces that work wherever the day takes you.</p>
+        <div><p className="eyebrow">Loved and chosen</p><h2>Best sellers</h2></div>
+        <p>Customer favourites, selected for the pieces worth coming back to.</p>
       </div>
       <div className="toolbar">
         <div className="category-tabs">
@@ -77,10 +91,14 @@ export default function HomePage({
         </div>
         <label className="sort">Sort by <select value={sort} onChange={event => onSortChange(event.target.value)}><option>Featured</option><option>Newest</option><option>Price: Low to high</option><option>Price: High to low</option></select><ChevronDown size={15} /></label>
       </div>
-      {loading ? <div className="loading-grid">{Array.from({ length: 8 }).map((_, index) => <div className="skeleton" key={index} />)}</div> :
-        visibleProducts.length ? <div className="product-grid">
-          {visibleProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} quantity={cart.find(item => item.id === product.id)?.quantity || 0} onOpen={() => onOpenProduct(product)} onSave={() => onToggleWishlist(product)} onAdd={() => onAddToCart(product)} onChangeQuantity={delta => onChangeCartQuantity(product.id, delta)} />)}
-        </div> : <div className="empty-search"><Search size={28} /><h3>No pieces found</h3><p>Try a different search or category.</p></div>}
+      {bestSellerLoading ? <div className="loading-grid">{Array.from({ length: 4 }).map((_, index) => <div className="skeleton" key={index} />)}</div> :
+        bestSellerProducts.length ? <div className="best-sellers-viewport" tabIndex={0} aria-label="Best-selling products">
+          <div className="best-sellers-track" ref={bestSellersTrack} style={{ '--best-sellers-duration': `${scrollDuration}s` }}>
+            {[0, 1].map(copy => <div className="best-sellers-track-group" key={copy} aria-hidden={copy === 1} inert={copy === 1}>
+              {bestSellerProducts.map(product => <ProductCard key={product.id} product={product} saved={wishlist.includes(product.id)} quantity={cart.find(item => item.id === product.id)?.quantity || 0} onOpen={() => onOpenProduct(product)} onSave={() => onToggleWishlist(product)} onAdd={() => onAddToCart(product)} onChangeQuantity={delta => onChangeCartQuantity(product.id, delta)} />)}
+            </div>)}
+          </div>
+        </div> : <div className="empty-search"><Search size={28} /><h3>No best sellers yet</h3><p>Check back soon for customer favourites.</p></div>}
     </section>
 
     <section className="story">

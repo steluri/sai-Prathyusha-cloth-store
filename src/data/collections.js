@@ -49,6 +49,13 @@ export const kidsCollections = [
   { name: 'Girls Collections', image: girlsCollectionsImage },
 ]
 
+export const allCollections = [
+  { name: 'All Products' },
+  { name: 'Women' },
+  { name: 'Men' },
+  { name: 'Kids' },
+]
+
 const collectionMatchers = {
   Men: {
     Shirts: /shirt|collar/i,
@@ -74,6 +81,11 @@ const collectionMatchers = {
 }
 
 export function matchesCollection(product, audience, type) {
+  if (audience === 'All') {
+    if (type === 'All Products') return true
+    if (type === 'Women' || type === 'Men') return product.category === type
+    return type === 'Kids' && matchesCollection(product, 'Kids', 'All Kids')
+  }
   if (audience === 'Kids') {
     const productText = `${product.name} ${product.description || ''}`
     const boysItem = product.category === 'Boy-Kid' || (product.category === 'Men' && /boy|junior|kid|child/i.test(productText))

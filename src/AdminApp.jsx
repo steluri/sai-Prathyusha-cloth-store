@@ -110,6 +110,23 @@ function AdminDashboard({ token, onLogout }) {
     }
   }
 
+  async function toggleBestSeller(product) {
+    try {
+      const response = await fetch(apiUrl(`/api/admin/products/${product.id}/best-seller`), {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ best_seller: !product.best_seller }),
+      })
+      if (response.status === 401) { onLogout(); return }
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not update best sellers')
+      setProducts(current => current.map(item => item.id === data.id ? { ...item, best_seller: data.best_seller } : item))
+      notify(data.best_seller ? 'Added to best sellers' : 'Removed from best sellers')
+    } catch (error) {
+      notify(error.message || 'Could not update best sellers')
+    }
+  }
+
   async function updateOrderStatus(order, status) {
     if (order.status === 'pending_verification' && !window.confirm(status === 'confirmed'
       ? `Confirm UTR ${order.upi_utr} for ${order.customer} only after checking the payment in your bank or UPI app?`
@@ -150,7 +167,7 @@ function AdminDashboard({ token, onLogout }) {
 
       <main className="admin-main">
         {tab === 'products'
-          ? <ProductsSection products={products} loading={loading} onEdit={startEdit} onDelete={deleteProduct} />
+          ? <ProductsSection products={products} loading={loading} onEdit={startEdit} onDelete={deleteProduct} onToggleBestSeller={toggleBestSeller} />
           : tab === 'orders'
           ? <OrdersSection orders={orders || []} loading={orders === null} onStatusChange={updateOrderStatus} onRefresh={loadOrders} />
           : <ProductForm

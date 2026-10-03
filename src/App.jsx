@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft, ArrowRight, Check, Heart, Menu, Search, ShoppingBag, UserRound, X,
+  ArrowLeft, ArrowRight, Check, Heart, Menu, Search, ShoppingBag, SlidersHorizontal, UserRound, X,
 } from 'lucide-react'
 import { apiUrl, assetUrl } from './api'
 import AccountPage from './components/AccountPage'
@@ -9,7 +9,7 @@ import EmailCheckout from './components/EmailCheckout'
 import HomePage from './components/HomePage'
 import ProductDetailPage from './components/ProductDetailPage'
 import { CartItem, Count, Drawer, Empty } from './components/StoreUI'
-import { kidsCollections, matchesCollection, mensCollections, womensCollections } from './data/collections'
+import { allCollections, kidsCollections, matchesCollection, mensCollections, womensCollections } from './data/collections'
 import { money } from './utils/format'
 
 const RAZORPAY_ENABLED = import.meta.env.VITE_ENABLE_RAZORPAY === 'true'
@@ -38,6 +38,8 @@ function App() {
   const [account, setAccount] = useState(() => JSON.parse(localStorage.getItem('Pandu-account') || 'null'))
   const [accountOpen, setAccountOpen] = useState(false)
   const [products, setProducts] = useState([])
+  const [bestSellerProducts, setBestSellerProducts] = useState([])
+  const [bestSellerLoading, setBestSellerLoading] = useState(true)
   const [wishlist, setWishlist] = useState([])
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('Pandu-cart') || '[]'))
   const [category, setCategory] = useState('All')
@@ -50,6 +52,7 @@ function App() {
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
   const [collectionView, setCollectionView] = useState(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [minimumPrice, setMinimumPrice] = useState('')
   const [maximumPrice, setMaximumPrice] = useState('')
@@ -62,6 +65,14 @@ function App() {
       .then(([catalog, saved]) => { setProducts(catalog); setWishlist(saved.map(p => p.id)) })
       .catch(() => setToast('Start the Python API to load the collection.'))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    fetch(apiUrl('/api/products/best-sellers'))
+      .then(response => { if (!response.ok) throw new Error(); return response.json() })
+      .then(setBestSellerProducts)
+      .catch(() => setBestSellerProducts([]))
+      .finally(() => setBestSellerLoading(false))
   }, [])
 
   useEffect(() => {
@@ -79,14 +90,14 @@ function App() {
     return () => clearTimeout(id)
   }, [toast])
 
-  const visibleProducts = useMemo(() => {
-    let list = products.filter(p => (category === 'All' || p.category === category) &&
+  const visibleBestSellers = useMemo(() => {
+    let list = bestSellerProducts.filter(p => (category === 'All' || p.category === category) &&
       `${p.name} ${p.color}`.toLowerCase().includes(search.toLowerCase()))
     if (sort === 'Price: Low to high') list = [...list].sort((a, b) => a.price - b.price)
     if (sort === 'Price: High to low') list = [...list].sort((a, b) => b.price - a.price)
     if (sort === 'Newest') list = [...list].sort((a, b) => b.id - a.id)
     return list
-  }, [products, category, search, sort])
+  }, [bestSellerProducts, category, search, sort])
 
   const collectionBaseProducts = useMemo(() => {
     if (!collectionView) return []
@@ -111,8 +122,10 @@ function App() {
   const collectionSizeGroups = useMemo(() => {
     if (!collectionView) return []
     const availableSizes = new Set(collectionBaseProducts.flatMap(product => Array.isArray(product.sizes) ? product.sizes : []))
-    const groups = collectionView.audience === 'Kids'
+    const groups = collectionView.audience === 'Kids' || (collectionView.audience === 'All' && collectionView.type === 'Kids')
       ? [{ label: 'Age', sizes: AGE_SIZES }]
+      : collectionView.audience === 'All' && collectionView.type === 'All Products'
+        ? [{ label: 'Letters', sizes: LETTER_SIZES }, { label: 'Waist (inches)', sizes: INCH_SIZES }, { label: 'Age', sizes: AGE_SIZES }]
       : LOWER_BODY_TYPES.has(collectionView.type)
         ? [{ label: 'Waist (inches)', sizes: INCH_SIZES }]
         : collectionView.type === 'All Products'
@@ -178,16 +191,25 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  function openHeaderCollection(audience, type) {
+    clearCatalogFilters()
+    setFiltersOpen(false)
+    openCollection(audience, type)
+  }
+
   function openProduct(product) {
+    setFiltersOpen(false)
     setSelectedProduct(product)
     setMobileOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function showHome() {
+    setFiltersOpen(false)
     setAccountOpen(false)
     setSelectedProduct(null)
     setCollectionView(null)
+    setMobileOpen(false)
   }
 
   function authenticate(nextAccount) {
@@ -209,26 +231,37 @@ function App() {
     setSaleOnly(false)
   }
 
-  const collectionTabs = collectionView?.audience === 'Kids'
-    ? kidsCollections
-    : collectionView?.audience === 'Women' ? womensCollections : mensCollections
+  const collectionTabs = collectionView?.audience === 'All'
+    ? allCollections
+    : collectionView?.audience === 'Kids'
+      ? kidsCollections
+      : collectionView?.audience === 'Women' ? womensCollections : mensCollections
 
   return (
     <div className="site-shell">
       <div className="announcement">Free shipping on orders over ₹2,999 <span>•</span> Easy 14-day returns</div>
       <header className="header">
-        <button className="icon-btn mobile-menu" aria-label="Menu" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={21} /></button>
-        <a className="logo" href="#top" onClick={showHome}>Pandu<span>.</span></a>
-        <nav className={mobileOpen ? 'nav open' : 'nav'}>
-          <button onClick={() => shopCategory('Women')}>Women</button>
-          <button onClick={() => shopCategory('Men')}>Men</button>
-          <button onClick={() => openCollection('Kids', 'All Kids')}>Kids</button>
-        </nav>
-        <div className="header-actions">
-          <label className="header-search"><Search size={18} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" /></label>
-          <button className="icon-btn" aria-label={account ? 'Profile' : 'Log in'} onClick={() => { setAccountOpen(true); setSelectedProduct(null); setCollectionView(null); setMobileOpen(false); window.scrollTo(0, 0) }}><UserRound size={20} /></button>
-          <button className="icon-btn" aria-label="Wishlist" onClick={() => setWishlistOpen(true)}><Heart size={20} /><Count value={wishlist.length} /></button>
-          <button className="icon-btn" aria-label="Shopping bag" onClick={() => setCartOpen(true)}><ShoppingBag size={20} /><Count value={cartCount} /></button>
+        <div className="header-top">
+          <button className="icon-btn mobile-menu" aria-label="Toggle menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}><Menu size={21} /></button>
+          <p className="header-note">Clothes for living, thoughtfully made.</p>
+          <a className="logo" href="#top" onClick={showHome}>Pandu<span>.</span></a>
+          <div className="header-actions">
+            <label className="header-search" aria-label="Search products"><Search size={21} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" aria-label="Search products" /></label>
+            {collectionView && !accountOpen && !selectedProduct && <button className="icon-btn collection-filter-mobile" aria-label="Filter and sort" aria-expanded={filtersOpen} aria-controls="catalog-filter-controls" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={19} /></button>}
+            <button className="icon-btn header-account" aria-label={account ? 'My account' : 'Log in or register'} onClick={() => { setAccountOpen(true); setSelectedProduct(null); setCollectionView(null); setMobileOpen(false); window.scrollTo(0, 0) }}><UserRound size={20} /><span>{account ? 'My account' : 'Login / Register'}</span></button>
+            <button className="icon-btn" aria-label="Wishlist" onClick={() => setWishlistOpen(true)}><Heart size={21} /><Count value={wishlist.length} /></button>
+            <button className="icon-btn header-bag" aria-label={`Shopping bag, ${cartCount} items, ${money(cartTotal)}`} onClick={() => setCartOpen(true)}><ShoppingBag size={21} /><Count value={cartCount} /><span className="header-total">{money(cartTotal)}</span></button>
+          </div>
+        </div>
+        <div className="header-nav-row">
+          <nav className={mobileOpen ? 'nav open' : 'nav'} aria-label="Main navigation">
+            <button onClick={showHome}>Home</button>
+            <button onClick={() => openHeaderCollection('All', 'All Products')}>Shop</button>
+            <button onClick={() => openHeaderCollection('Women', 'All Products')}>Women</button>
+            <button onClick={() => openHeaderCollection('Men', 'All Products')}>Men</button>
+            <button onClick={() => openHeaderCollection('Kids', 'All Kids')}>Kids</button>
+            {collectionView && !accountOpen && !selectedProduct && <button className={`collection-filter-tab${filtersOpen ? ' active' : ''}`} aria-expanded={filtersOpen} aria-controls="catalog-filter-controls" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={16} /> Filter &amp; Sort</button>}
+          </nav>
         </div>
       </header>
 
@@ -255,6 +288,8 @@ function App() {
         collectionColors={collectionColors}
         collectionSizeGroups={collectionSizeGroups}
         collectionProducts={collectionProducts}
+        filtersOpen={filtersOpen}
+        onCloseFilters={() => setFiltersOpen(false)}
         cart={cart}
         wishlist={wishlist}
         loading={loading}
@@ -282,8 +317,8 @@ function App() {
         collectionView={collectionView}
         category={category}
         sort={sort}
-        loading={loading}
-        visibleProducts={visibleProducts}
+        bestSellerLoading={bestSellerLoading}
+        bestSellerProducts={visibleBestSellers}
         cart={cart}
         wishlist={wishlist}
         onCategoryChange={setCategory}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ImagePlus, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ImagePlus, LoaderCircle, Pencil, Plus, Star, Trash2, X } from 'lucide-react'
 import { apiUrl, assetUrl } from '../../api'
 import { mensCollections, womensCollections } from '../../data/collections'
 import { money } from '../../utils/format'
@@ -101,7 +101,7 @@ export function OrdersSection({ orders, loading, onStatusChange, onRefresh }) {
   )
 }
 
-export function ProductsSection({ products, loading, onEdit, onDelete }) {
+export function ProductsSection({ products, loading, onEdit, onDelete, onToggleBestSeller }) {
   if (loading) return <p className="admin-empty">Loading products…</p>
   if (!products.length) return <p className="admin-empty">No products yet. Add your first one.</p>
   return (
@@ -116,6 +116,7 @@ export function ProductsSection({ products, loading, onEdit, onDelete }) {
             <div className="admin-card-actions">
               <button className="button outline" onClick={() => onEdit(product)}><Pencil size={14} /> Edit</button>
               <button className="button outline danger" onClick={() => onDelete(product)}><Trash2 size={14} /> Remove</button>
+              <button className={`button outline admin-best-seller-toggle${product.best_seller ? ' active' : ''}`} aria-pressed={Boolean(product.best_seller)} onClick={() => onToggleBestSeller(product)}><Star size={14} fill={product.best_seller ? 'currentColor' : 'none'} />{product.best_seller ? 'Remove from best sellers' : 'Mark as best seller'}</button>
             </div>
           </div>
         </article>

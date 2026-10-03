@@ -21,5 +21,8 @@
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true
   }
 }
